@@ -124,6 +124,7 @@ export default {
 
                 if (data.success) {
                     alert('Registro completado con éxito.');
+                    this.$router.push({ name: 'Inicio' });
                 } else {
                     alert('Error en el registro, porfavor revise los datos.');
                 }

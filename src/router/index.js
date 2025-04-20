@@ -91,7 +91,12 @@ router.beforeEach((to, from, next) => {
 
 
   if (requiresAuth && !token) {
-    next('/dashboard');
+    // Evita redirigir al login si ya estamos en la página de login
+    if (to.path !== '/login') {
+      next('/login');
+    } else {
+      next();
+    }
   } else {
     next();
   }

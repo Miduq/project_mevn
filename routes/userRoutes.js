@@ -7,6 +7,8 @@ const isAuthenticated = require('../middleware/authMiddleware');
 
 // Ruta para obtener todos los usuarios (protegida)
 router.get('/', isAuthenticated, userController.getAllUsers);
+// Ruta para obtener solo los profesores (protegida)
+router.get('/teachers', isAuthenticated, userController.getTeachers);
 
 // Ruta para buscar usuarios (protegida)
 router.get('/search', isAuthenticated, userController.searchUsers);

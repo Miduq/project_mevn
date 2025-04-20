@@ -30,6 +30,22 @@ exports.getAllUsers = async (req, res) => {
     }
 };
 
+// Obtener solo los profesores
+exports.getTeachers = async (req, res) => {
+    try {
+      const teacherRoleId = 2; 
+      const teachers = await User.findAll({
+        where: { rol: teacherRoleId },
+        attributes: ['id', 'name', 'surname'], // Solo los campos necesarios
+        order: [['surname', 'ASC'], ['name', 'ASC']]
+      });
+      res.json({ success: true, teachers });
+    } catch (error) {
+       console.error('Error fetching teachers:', error);
+       res.status(500).json({ success: false, message: 'Error al obtener los profesores.' });
+    }
+  };
+
 // Buscar usuarios por nombre o email
 exports.searchUsers = async (req, res) => {
     try {

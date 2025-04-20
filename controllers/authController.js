@@ -95,7 +95,7 @@ exports.register = async (req, res) => {
         });
 
         res.json({ success: true, message: 'Usuario registrado correctamente. Por favor, valida tu correo.', user: newUser });
-
+        
         // Enviar correo de validación
         const validationUrl = `http://localhost:8080/validate-email?token=${accessToken}`;
         await emailService.sendValidationEmail(email, nombre, validationUrl);

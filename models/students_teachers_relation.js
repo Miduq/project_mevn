@@ -1,3 +1,5 @@
+// students_teachers_relation.js
+
 'use strict';
 const { Model, DataTypes } = require('sequelize');
 

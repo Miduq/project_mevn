@@ -1,3 +1,5 @@
+// session.js
+
 'use strict';
 const { Model, DataTypes } = require('sequelize');
 

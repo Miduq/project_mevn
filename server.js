@@ -13,7 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const studentsTeachersRelationRoutes = require('./routes/studentsTeachersRelationRoutes');
-
+const subjectRoutes = require('./routes/subjectRoutes');
 
 const app = express();
 
@@ -35,7 +35,8 @@ app.use('/uploads/profile_images', express.static(path.join(__dirname, 'uploads/
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/roles', roleRoutes);
-app.use('/relations', studentsTeachersRelationRoutes); // Prefijo 'relations' para estas rutas
+app.use('/relations', studentsTeachersRelationRoutes);
+app.use('/subjects', subjectRoutes);
 
 // Manejar rutas no definidas (404)
 app.use('*', (req, res) => {

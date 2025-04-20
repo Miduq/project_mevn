@@ -26,17 +26,6 @@
         <div v-else-if="isProfesor">
             <h3>Lista de Alumnos y Asignaturas</h3>
             <b-table :items="students" :fields="fieldsProfesor" striped hover>
-                <!-- Botones de Editar / Eliminar -->
-                <template #cell(actions)="row">
-                    <b-button size="sm" variant="warning" @click="editRelation(row.item)">
-                        <span class="material-icons">edit</span>
-                        Editar
-                    </b-button>
-                    <b-button size="sm" variant="danger" class="ml-2" @click="deleteRelation(row.item)">
-                        <span class="material-icons">delete</span>
-                        Eliminar
-                    </b-button>
-                </template>
             </b-table>
         </div>
     </div>
@@ -72,7 +61,6 @@ export default {
                 { key: 'surname', label: 'Apellidos' },
                 { key: 'email', label: 'Email' },
                 { key: 'subject', label: 'Asignatura' },
-                { key: 'actions', label: 'Acciones' } // Editar/Eliminar
             ]
         };
     },
@@ -157,43 +145,7 @@ export default {
                 console.error('Error al obtener alumnos:', error);
             }
         },
-
-        editRelation(rowItem) {
-            // Redirigir a una vista de edición pasando los detalles de la relación
-            // Crear una ruta como '/edit-relation/:teacherId/:studentId/:subjectId'
-            this.$router.push({
-                name: 'EditRelationPage',
-                params: {
-                    teacherId: rowItem.id_teacher,
-                    studentId: rowItem.id_student,
-                    subjectId: rowItem.id_subject
-                }
-            });
-            console.log('Editar relación', rowItem);
-        },
-        async deleteRelation(rowItem) {
-            // Confirmar la eliminación
-            if (confirm(`¿Estás seguro de que deseas eliminar la relación con el alumno ${rowItem.name} ${rowItem.surname} en la asignatura ${rowItem.subject}?`)) {
-                try {
-                    const payload = {
-                        id_student: rowItem.id_student,
-                        id_teacher: rowItem.id_teacher,
-                        id_subject: rowItem.id_subject
-                    };
-                    const response = await apiClient.delete(`/relations/delete`, { data: payload });
-                    if (response.data.success) {
-                        alert('Relación eliminada exitosamente.');
-                        // Refrescar la lista de alumnos
-                        this.fetchMyStudents();
-                    } else {
-                        alert('Error al eliminar la relación: ' + response.data.message);
-                    }
-                } catch (error) {
-                    console.error('Error al eliminar la relación:', error);
-                    alert('Error al eliminar la relación.');
-                }
-            }
-        },
+        
         logout() {
             // Borrar el token y redirigir al inicio
             localStorage.removeItem("token");

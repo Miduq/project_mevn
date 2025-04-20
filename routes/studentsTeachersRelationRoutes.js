@@ -14,4 +14,10 @@ router.get('/my-students/:teacherId', isAuthenticated, studentsTeachersRelationC
 // Ruta para obtener asignaturas que imparte un profesor + número de alumnos (protegida)
 router.get('/subjects-teacher/:teacherId', isAuthenticated, studentsTeachersRelationController.getSubjectsTeacher);
 
+// Ruta para obtener las relaciones de un estudiante específico (para edición)
+router.get('/student/:studentId', isAuthenticated, studentsTeachersRelationController.getRelationsForStudent);
+
+router.post('/', isAuthenticated, studentsTeachersRelationController.addRelation);
+router.delete('/:relationId', isAuthenticated, studentsTeachersRelationController.deleteRelation);
+
 module.exports = router;
