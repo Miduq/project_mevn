@@ -3,7 +3,7 @@
 class Role {
   constructor(data = {}) {
     this.id = data.id || null;
-    this.role_name = data.role_name || '';
+    this.role_name = data.role_name || "";
   }
 }
 

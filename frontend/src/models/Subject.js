@@ -3,7 +3,7 @@
 class Subject {
   constructor(data = {}) {
     this.id = data.id || null;
-    this.subject = data.subject || '';
+    this.subject = data.subject || "";
   }
 }
 

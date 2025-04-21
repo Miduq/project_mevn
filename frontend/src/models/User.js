@@ -3,12 +3,12 @@
 class User {
   constructor(data = {}) {
     this.id = data.id || null;
-    this.username = data.username || '';
-    this.name = data.name || '';
-    this.surname = data.surname || '';
-    this.email = data.email || '';
+    this.username = data.username || "";
+    this.name = data.name || "";
+    this.surname = data.surname || "";
+    this.email = data.email || "";
     this.rol = data.rol || null; // El ID del rol
-    this.role_name = data.role_name || ''; // El nombre del rol
+    this.role_name = data.role_name || ""; // El nombre del rol
     this.active = data.active === true || data.active === 1; // Aseguramos que sea booleano
     this.profile_image = data.profile_image || null;
   }
@@ -18,11 +18,11 @@ class User {
   }
 
   isTeacher() {
-    return this.rol === 2 || this.role_name === 'teacher';
+    return this.rol === 2 || this.role_name === "teacher";
   }
 
   isStudent() {
-    return this.rol === 1 || this.role_name === 'student';
+    return this.rol === 1 || this.role_name === "student";
   }
 }
 
