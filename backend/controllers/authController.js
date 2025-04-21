@@ -9,7 +9,7 @@ const emailService = require('../services/emailService');
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_PROFESOR = '3rhb23uydb238ry6g2429hrh';
 
-// Iniciar sesión
+// Lógica para el inicio de sesión
 exports.login = async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -31,7 +31,7 @@ exports.login = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Contraseña incorrecta.' });
         }
 
-        // Generar JWT
+        // Generar JWT ( Para validar con isAuthenticated() )
         const token = jwt.sign(
             { id: user.id, username: user.username, role: user.rol },
             JWT_SECRET,

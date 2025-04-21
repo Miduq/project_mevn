@@ -32,7 +32,8 @@
 </template>
 
 <script>
-import apiClient from '../../services/apiService';
+import AuthService from '@/services/auth/AuthService';
+import RelationService from '@/services/relations/RelationService';
 
 export default {
     name: "DashboardPage",
@@ -90,67 +91,57 @@ export default {
     methods: {
         async fetchUserData() {
             try {
-                const response = await apiClient.get('/auth/me');
-                if (response.data.success) {
-                    this.userData = response.data.user;
-                    this.userData.rolName = (this.userData.rol === 1) ? 'alumno' : 'profesor';
+                const data = await AuthService.getMe();
+                if (data.success) {
+                    this.userData = data.user;
+                    // Asignar rolName basado en el ID numérico
+                    if (this.userData.rol === 1) this.userData.rolName = 'alumno';
+                    else if (this.userData.rol === 2) this.userData.rolName = 'profesor';
+                    else this.userData.rolName = 'desconocido';
                     console.log('Usuario obtenido:', this.userData);
                 } else {
-                    console.error('Error al obtener datos del usuario:', response.data.message);
-                    this.$router.push('/');
+                    console.error('Error al obtener datos del usuario (backend):', data.message);
+                    this.logout(); // Llama al método de logout si falla
                 }
             } catch (error) {
-                console.error('Error al obtener datos del usuario:', error);
-                this.$router.push('/');
+                console.error('Error de red/servicio al obtener datos del usuario:', error);
+                this.logout(); // Llama al método de logout si falla
             }
         },
         async fetchMyProfessors() {
+            if (!this.userData.id) return;
             try {
                 const studentId = this.userData.id;
-                const response = await apiClient.get(`/relations/my-professors/${studentId}`);
-                if (response.data.success) {
-                    // Añadir id_teacher, id_student y id_subject a cada profesor para futuras operaciones
-                    this.professors = response.data.professors.map(prof => ({
-                        ...prof,
-                        id_teacher: prof.id_teacher, // Asegúrate de que el backend retorna estos campos
-                        id_student: prof.id_student,
-                        id_subject: prof.id_subject
-                    }));
+                const data = await RelationService.getMyProfessors(studentId);
+                if (data.success) {
+                    this.professors = data.professors;
                     console.log('Profesores obtenidos:', this.professors);
                 } else {
-                    console.error('Error al obtener profesores:', response.data.message);
+                    console.error('Error al obtener profesores:', data.message);
                 }
             } catch (error) {
-                console.error('Error al obtener profesores:', error);
+                console.error('Error de red/servicio al obtener profesores:', error);
             }
         },
-
         async fetchMyStudents() {
+             if (!this.userData.id) return;
             try {
                 const teacherId = this.userData.id;
-                const response = await apiClient.get(`/relations/my-students/${teacherId}`);
-                if (response.data.success) {
-                    // Añadir id_teacher, id_student y id_subject a cada alumno para futuras operaciones
-                    this.students = response.data.students.map(student => ({
-                        ...student,
-                        id_teacher: student.id_teacher, // Asegúrate de que el backend retorna estos campos
-                        id_student: student.id_student,
-                        id_subject: student.id_subject
-                    }));
+                const data = await RelationService.getMyStudents(teacherId);
+               
+                if (data.success) {
+                    this.students = data.students;
                     console.log('Alumnos obtenidos:', this.students);
                 } else {
-                    console.error('Error al obtener alumnos:', response.data.message);
+                    console.error('Error al obtener alumnos:', data.message);
                 }
             } catch (error) {
-                console.error('Error al obtener alumnos:', error);
+                console.error('Error de red/servicio al obtener alumnos:', error);
             }
         },
-        
         logout() {
-            // Borrar el token y redirigir al inicio
-            localStorage.removeItem("token");
+            AuthService.logout(); // Llama a la función logout del servicio
             this.$router.push('/');
-            console.log('Usuario ha cerrado sesión');
         }
     }
 };

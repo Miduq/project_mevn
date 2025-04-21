@@ -101,7 +101,10 @@
 <script>
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import apiClient from '../../services/apiService'; // Importar apiClient
+import UsersService from '@/services/users/UsersService';
+import RoleService from '@/services/roles/RoleService';
+import SubjectService from '@/services/subjects/SubjectService';
+import RelationService from '@/services/relations/RelationService';
 
 export default {
     name: 'EditUserPage',
@@ -131,15 +134,15 @@ export default {
 
         const fetchRoles = async () => {
             try {
-                const response = await apiClient.get('/roles'); // Usar apiClient
-                if (response.data.success) {
-                    roles.value = response.data.roles;
+                const data = await RoleService.getAllRoles();
+                if (data.success) {
+                    roles.value = data.roles;
                 } else {
                     errorMessage.value = 'Error al obtener los roles.';
                 }
             } catch (error) {
                 console.error('Error al obtener los roles:', error);
-                errorMessage.value = 'Ocurrió un error al obtener los roles.';
+                errorMessage.value = error.message || 'Ocurrió un error al obtener los roles.';
             }
         };
 
@@ -147,18 +150,22 @@ export default {
             loadingUser.value = true;
             errorMessage.value = '';
             try {
-                const response = await apiClient.get(`/users/${props.id}`);
-                if (response.data.success) {
-                    user.value = response.data.user; 
+                const data = await UsersService.getUserById(props.id);
+                if (data.success) {
+                    user.value = data.user;
+                    console.log('Datos del usuario cargado:', JSON.stringify(user.value, null, 2));
                     if (user.value.rol === 1) {
-                         fetchAllRelationData();
+                        console.log('Es Alumno (Rol ID:', user.value.rol, '), cargando relaciones...');
+                        fetchAllRelationData();
+                    } else {
+                        console.log('NO es Alumno (Rol ID:', user.value.rol, '), no se carga sección asignaturas.');
                     }
                 } else {
-                    errorMessage.value = 'Error al obtener la información del usuario.';
+                    errorMessage.value = data.message || 'Error al obtener la información del usuario.';
                 }
             } catch (error) {
                 console.error('Error al obtener el usuario:', error);
-                errorMessage.value = error.response?.data?.message || 'Ocurrió un error al obtener la información del usuario.';
+                errorMessage.value = error.message || 'Ocurrió un error al obtener la información del usuario.';
             } finally {
                 loadingUser.value = false;
             }
@@ -168,15 +175,15 @@ export default {
             loadingRelations.value = true;
             relationsErrorMessage.value = '';
             try {
-                const response = await apiClient.get(`/relations/student/${props.id}`);
-                if (response.data.success) {
-                    studentRelations.value = response.data.relations;
+                const data = await RelationService.getRelationsForStudent(props.id);
+                if (data.success) {
+                    studentRelations.value = data.relations;
                 } else {
-                    relationsErrorMessage.value = 'Error al cargar las asignaturas asignadas.';
+                    relationsErrorMessage.value = data.message || 'Error al cargar las asignaturas asignadas.';
                 }
             } catch (error) {
                 console.error('Error fetching student relations:', error);
-                relationsErrorMessage.value = 'Error al cargar las asignaturas asignadas.';
+                relationsErrorMessage.value = error.message ||'Error al cargar las asignaturas asignadas.';
             } finally {
                  loadingRelations.value = false;
             }
@@ -184,86 +191,81 @@ export default {
 
         const fetchSubjects = async () => {
             try {
-                const response = await apiClient.get('/subjects');
-                if (response.data.success) {
-                    subjects.value = response.data.subjects;
+                const data = await SubjectService.getAllSubjects();
+                 // --- FIN CAMBIO ---
+                if (data.success) {
+                    subjects.value = data.subjects;
                 }
             } catch (error) {
                 console.error('Error fetching subjects:', error);
-                relationsErrorMessage.value = 'Error al cargar lista de asignaturas.';
+                relationsErrorMessage.value = error.message || 'Error al cargar lista de asignaturas.';
             }
         };
 
         const fetchTeachers = async () => {
             try {
-                const response = await apiClient.get('/users/teachers');
-                if (response.data.success) {
-                    teachers.value = response.data.teachers;
+                const data = await UsersService.getTeachers();
+                if (data.success) {
+                    teachers.value = data.teachers;
                 }
             } catch (error) {
                 console.error('Error fetching teachers:', error);
-                relationsErrorMessage.value = 'Error al cargar lista de profesores.';
+                relationsErrorMessage.value = error.message || 'Error al cargar lista de profesores.';
             }
         };
 
         // Función para cargar todos los datos necesarios para las relaciones
         const fetchAllRelationData = async () => {
-             loadingRelations.value = true; // Mostrar carga general para la sección
+             loadingRelations.value = true;
              await Promise.all([fetchStudentRelations(), fetchSubjects(), fetchTeachers()]);
-             loadingRelations.value = false; // Ocultar carga general
+             loadingRelations.value = false;
         }
-
 
         const addRelation = async () => {
             if (!selectedSubject.value || !selectedTeacher.value) return;
-
             addingRelation.value = true;
             addRelationMessage.value = '';
             addRelationError.value = false;
-
             try {
                 const payload = {
-                    studentId: parseInt(props.id), // Asegúrate que es número
+                    studentId: parseInt(props.id),
                     subjectId: selectedSubject.value,
                     teacherId: selectedTeacher.value,
                 };
-                const response = await apiClient.post('/relations', payload);
-
-                if (response.data.success) {
+                const data = await RelationService.addRelation(payload);
+                if (data.success) {
                     addRelationMessage.value = 'Asignatura añadida correctamente.';
-                    selectedSubject.value = ''; // Limpiar selects
+                    selectedSubject.value = '';
                     selectedTeacher.value = '';
-                    await fetchStudentRelations(); // Recargar la lista de relaciones
+                    await fetchStudentRelations();
                 } else {
                      addRelationError.value = true;
-                    addRelationMessage.value = response.data.message || 'Error al añadir la asignatura.';
+                    addRelationMessage.value = data.message || 'Error al añadir la asignatura.';
                 }
             } catch (error) {
                 console.error('Error adding relation:', error);
                 addRelationError.value = true;
-                addRelationMessage.value = error.response?.data?.message || 'Error al añadir la asignatura.';
+                addRelationMessage.value = error.response?.data?.message || error.message || 'Error al añadir la asignatura.';
             } finally {
                 addingRelation.value = false;
-                 // Opcional: Ocultar mensaje después de unos segundos
                 setTimeout(() => { addRelationMessage.value = ''; }, 5000);
             }
         };
 
          const removeRelation = async (relationId) => {
             if (!confirm('¿Estás seguro de que quieres quitar esta asignatura?')) return;
-
-             relationsErrorMessage.value = ''; // Limpiar errores previos
-
+             relationsErrorMessage.value = '';
             try {
-                const response = await apiClient.delete(`/relations/${relationId}`);
-                 if (response.data.success) {
-                     await fetchStudentRelations(); // Recargar la lista
+
+                const data = await RelationService.deleteRelation(relationId);
+                 if (data.success) {
+                     await fetchStudentRelations();
                  } else {
-                    relationsErrorMessage.value = response.data.message || 'Error al quitar la asignatura.';
+                    relationsErrorMessage.value = data.message || 'Error al quitar la asignatura.';
                  }
             } catch (error) {
                 console.error('Error removing relation:', error);
-                relationsErrorMessage.value = error.response?.data?.message || 'Error al quitar la asignatura.';
+                relationsErrorMessage.value = error.response?.data?.message || error.message || 'Error al quitar la asignatura.';
             }
         };
 
@@ -276,16 +278,17 @@ export default {
                     email: user.value.email,
                     rol: user.value.rol,
                 };
-                const response = await apiClient.put(`/users/${props.id}`, payload);
-                 if (response.data.success) {
-                    alert('Usuario actualizado exitosamente.'); // Puedes usar un modal o notificación mejor
-                    router.push({ name: 'UserListPage' }); // Ajusta el nombre de la ruta si es necesario
+
+                const data = await UsersService.updateUser(props.id, payload);
+                 if (data.success) {
+                    alert('Usuario actualizado exitosamente.');
+                    router.push({ name: 'UserListPage' });
                  } else {
-                    errorMessage.value = response.data.message || 'Error al actualizar el usuario.';
+                    errorMessage.value = data.message || 'Error al actualizar el usuario.';
                  }
             } catch (error) {
                 console.error('Error al actualizar el usuario:', error);
-                errorMessage.value = error.response?.data?.message || 'Ocurrió un error al actualizar el usuario.';
+                errorMessage.value = error.response?.data?.message || error.message || 'Ocurrió un error al actualizar el usuario.';
             }
         };
 
@@ -301,25 +304,10 @@ export default {
         });
 
         return {
-            user,
-            roles,
-            updateUser,
-            loadingUser,
-            errorMessage,
-
-            // Exportar nuevas refs y métodos
-            studentRelations,
-            subjects,
-            teachers,
-            selectedSubject,
-            selectedTeacher,
-            loadingRelations,
-            relationsErrorMessage,
-            addingRelation,
-            addRelationMessage,
-            addRelationError,
-            addRelation,
-            removeRelation,
+            user, roles, updateUser, loadingUser, errorMessage, studentRelations,
+            subjects, teachers, selectedSubject, selectedTeacher, loadingRelations,
+            relationsErrorMessage, addingRelation, addRelationMessage, addRelationError,
+            addRelation, removeRelation,
         };
     },
 };

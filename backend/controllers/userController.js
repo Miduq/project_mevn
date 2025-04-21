@@ -156,3 +156,51 @@ exports.updateUser = async (req, res) => {
         res.status(500).json({ success: false, message: 'Error al actualizar el usuario.' });
     }
 };
+
+exports.uploadProfilePicture = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No se proporcionó un archivo de imagen válido.' });
+        }
+
+        const userId = req.params.id;
+        const filename = req.file.filename; // Multer nos da el nombre único del archivo guardado
+
+        // Actualizar el registro del usuario en la base de datos
+        const [numberOfAffectedRows] = await User.update(
+            { profile_image: filename }, 
+            { where: { id: userId } }  
+        );
+
+        // Verificar si se actualizó alguna fila
+        if (numberOfAffectedRows === 0) {
+            try { await fs.unlink(req.file.path); } catch (e) { console.error("Error borrando archivo de usuario no encontrado:", e); }
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado para actualizar imagen.' });
+        }
+
+        // Enviar una respuesta exitosa al frontend
+        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/profile_images/${filename}`;
+
+        res.status(200).json({
+            success: true,
+            message: 'Imagen de perfil actualizada correctamente.',
+            filename: filename,
+            imageUrl: imageUrl
+        });
+
+    } catch (error) {
+        console.error("Error en uploadProfilePicture Controller:", error);
+
+        if (req.file && req.file.path) {
+            try { await fs.unlink(req.file.path); } catch (e) { console.error("Error borrando archivo tras error en controlador:", e); }
+        }
+
+        if (error instanceof multer.MulterError) {
+            return res.status(400).json({ success: false, message: `Error de Multer: ${error.message}`});
+        } else if (error.message && error.message.includes('Solo se permiten archivos de imagen')) { // Error de tu fileFilter
+            return res.status(400).json({ success: false, message: error.message });
+        }
+
+        res.status(500).json({ success: false, message: 'Error interno del servidor al actualizar la imagen.' });
+    }
+};

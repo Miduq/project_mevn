@@ -54,7 +54,7 @@
 </template>
 
 <script>
-import apiClient from '../../services/apiService';
+import UsersService from '@/services/users/UsersService';
 
 export default {
     name: 'UserListPage',
@@ -79,31 +79,27 @@ export default {
             this.users = [];
 
             try {
-                const response = await apiClient.get('/users/search', {
-                    params: { query: this.searchQuery }
-                });
+                const data = await UsersService.searchUsers(this.searchQuery);
 
-                if (response.data.success) {
-                    this.users = response.data.users;
+                if (data.success) {
+                    this.users = data.users; // Asigna los usuarios desde data.users
                     if (this.users.length === 0) {
                         this.errorMessage = 'No se encontraron usuarios con los criterios de búsqueda proporcionados.';
                     }
                 } else {
-                    this.errorMessage = 'Error al buscar los usuarios.';
+                    // Si el backend devuelve success: false
+                    this.errorMessage = data.message || 'Error al buscar los usuarios.';
                 }
             } catch (error) {
-                console.error('Error al buscar usuarios:', error);
-                if (error.response && error.response.data && error.response.data.message) {
-                    this.errorMessage = error.response.data.message;
-                } else {
-                    this.errorMessage = 'Ocurrió un error al buscar los usuarios.';
-                }
+            // Captura errores lanzados por el servicio
+            console.error('Error al buscar usuarios:', error);
+            this.errorMessage = error.response?.data?.message || error.message || 'Ocurrió un error al buscar los usuarios.';
             } finally {
-                this.loading = false;
+            this.loading = false; // Asegúrate de que loading se ponga a false
             }
+            },
         },
-    },
-};
+    };
 </script>
 
 <style scoped>

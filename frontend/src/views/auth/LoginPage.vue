@@ -33,7 +33,7 @@
 
 <script>
 // Importa la función 'login' desde apiService.js
-import { login } from '../../services/apiService';
+import AuthService from '@/services/auth/AuthService';
 
 export default {
     name: "LoginPage",
@@ -44,39 +44,29 @@ export default {
             errorMessage: ''
         };
     },
+    // methods dentro de export default { ... }
     methods: {
         async loginUser() {
             try {
-                console.log('Intentando iniciar sesión con:', this.username, this.password);
-                const response = await login(this.username, this.password);
-                console.log('Respuesta del servidor completa:', response);
-                console.log('Datos de la respuesta:', response.data);
-
-                if (response.data.success) {
-                    console.log('Inicio de sesión exitoso. Token recibido:', response.data.token);
-                    localStorage.setItem('token', response.data.token);
-                    // Emitir evento de login exitoso
-                    window.dispatchEvent(new Event('login'));
-
+                const data = await AuthService.login(this.username, this.password);
+                console.log('Respuesta del servicio completa:', data);
+                if (data.success) {
+                    console.log('Inicio de sesión exitoso.');
                     this.$router.push('/dashboard');
                 } else {
-                    console.log('Error en el inicio de sesión:', response.data.message);
-                    this.errorMessage = response.data.message;
+                    console.log('Error en el inicio de sesión:', data.message);
+                    this.errorMessage = data.message || 'Credenciales incorrectas o error desconocido.';
                 }
             } catch (error) {
                 if (error.response && error.response.data && error.response.data.message) {
                     this.errorMessage = error.response.data.message;
-                    console.error('Error en la solicitud de login:', error.response.data.message);
+                    console.error('Error en la solicitud de login (catch):', error.response.data.message);
                 } else {
-                    this.errorMessage = 'Error al iniciar sesión. Intenta de nuevo.';
-                    console.error('Error en la solicitud de login:', error);
+                    this.errorMessage = error.message || 'Error al iniciar sesión. Intenta de nuevo.';
+                    console.error('Error en la solicitud de login (catch):', error);
                 }
             }
         }
     }
 };
 </script>
-
-<style scoped>
-/* Puedes agregar estilos personalizados aquí */
-</style>
