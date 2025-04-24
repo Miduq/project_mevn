@@ -1,218 +1,249 @@
+<!-- frontend/src/views/auth/RegisterUserPage.vue -->
+
 <template>
   <div class="form-container">
     <h2>Registro de usuarios</h2>
-    <b-form @submit="onSubmit" @reset="onReset" v-if="show">
-      <b-form-group id="input-group-1" label="Tu nombre:" label-for="input-1">
+
+    <div v-if="message" :class="['alert', isError ? 'alert-danger' : 'alert-success']" role="alert">
+      {{ message }}
+    </div>
+
+    <b-form @submit.prevent="onSubmit" @reset="onReset" v-if="showForm">
+      <b-form-group id="input-group-name" label="Tu nombre:" label-for="input-name">
         <b-form-input
-          id="input-1"
-          v-model="form.nombre"
+          id="input-name"
+          v-model="form.name"
           placeholder="Introduce tu nombre"
           required
+          :disabled="isSubmitting"
         ></b-form-input>
       </b-form-group>
 
-      <b-form-group
-        id="input-group-2"
-        label="Tus apellidos:"
-        label-for="input-2"
-      >
+      <b-form-group id="input-group-surname" label="Tus apellidos:" label-for="input-surname">
         <b-form-input
-          id="input-2"
-          v-model="form.apellidos"
+          id="input-surname"
+          v-model="form.surname"
           placeholder="Introduce tus apellidos"
           required
+          :disabled="isSubmitting"
         ></b-form-input>
       </b-form-group>
 
-      <b-form-group
-        id="input-group-2"
-        label="Nombre de usuario:"
-        label-for="input-3"
-      >
+      <b-form-group id="input-group-username" label="Nombre de usuario:" label-for="input-username">
         <b-form-input
-          id="input-3"
+          id="input-username"
           v-model="form.username"
           placeholder="Introduce un nombre de usuario"
           required
+          :disabled="isSubmitting"
         ></b-form-input>
       </b-form-group>
 
       <b-form-group
-        id="input-group-4"
+        id="input-group-email"
         label="Correo electrónico:"
-        label-for="input-4"
-        description="No compartiremos esta información con nadie más."
+        label-for="input-email"
+        description="Necesitamos un email válido para activar tu cuenta."
       >
         <b-form-input
-          id="input-4"
+          id="input-email"
           v-model="form.email"
           type="email"
           :state="emailState"
           placeholder="Introduce tu email"
           required
+          :disabled="isSubmitting"
         ></b-form-input>
-        <b-form-invalid-feedback>
+        <b-form-invalid-feedback :state="emailState">
           Por favor, introduce un correo electrónico válido.
         </b-form-invalid-feedback>
       </b-form-group>
 
-      <b-form-group id="input-group-5" label="Contraseña:" label-for="input-5">
+      <b-form-group id="input-group-password" label="Contraseña:" label-for="input-password">
         <b-form-input
-          id="input-5"
+          id="input-password"
           v-model="form.password"
           type="password"
           :state="passwordState"
           placeholder="Introduce tu contraseña"
           required
+          :disabled="isSubmitting"
         ></b-form-input>
+        <b-form-invalid-feedback :state="passwordState"> Las contraseñas no coinciden. </b-form-invalid-feedback>
       </b-form-group>
 
-      <b-form-group
-        id="input-group-6"
-        label="Repetir Contraseña:"
-        label-for="input-6"
-        description="Las contraseñas deben coincidir."
-      >
+      <b-form-group id="input-group-retype-password" label="Repetir Contraseña:" label-for="input-retype-password">
         <b-form-input
-          id="input-6"
+          id="input-retype-password"
           v-model="form.retype_password"
           type="password"
           :state="passwordState"
           placeholder="Vuelve a introducir tu contraseña"
           required
+          :disabled="isSubmitting"
         ></b-form-input>
-        <b-form-invalid-feedback>
-          Las contraseñas no coinciden.
-        </b-form-invalid-feedback>
       </b-form-group>
 
-      <b-form-group id="input-group-7" label="Rol:" label-for="input-7">
+      <b-form-group id="input-group-rol" label="Rol:" label-for="input-rol">
         <b-form-select
-          id="input-7"
+          id="input-rol"
           v-model="form.rol"
-          :options="rol"
+          :options="rolOptions"
           required
+          :disabled="isSubmitting"
         ></b-form-select>
       </b-form-group>
 
       <b-form-group
-        id="input-group-8"
-        label="Token de validación:"
-        label-for="input-8"
-        v-if="form.rol === 'Profesor'"
+        id="input-group-token"
+        label="Token de validación Profesor:"
+        label-for="input-token"
+        v-if="form.rol === 2"
       >
         <b-form-input
-          id="input-8"
+          id="input-token"
           v-model="form.token"
           type="text"
           placeholder="Introduce el token de validación"
-          required
+          :required="form.rol === 2"
+          :disabled="isSubmitting"
+          aria-describedby="token-feedback"
         ></b-form-input>
-        <b-form-invalid-feedback v-if="tokenError"
-          >El token introducido no es válido.</b-form-invalid-feedback
-        >
+        <b-form-invalid-feedback id="token-feedback" :state="!isError || form.rol !== 2">
+          {{ message }}
+        </b-form-invalid-feedback>
       </b-form-group>
 
-      <div class="d-flex justify-content-between">
-        <b-button type="submit" variant="primary">Enviar</b-button>
-        <b-button type="reset" variant="danger">Vaciar</b-button>
+      <div class="d-flex justify-content-between mt-4">
+        <b-button type="submit" variant="primary" :disabled="isSubmitting">
+          <span v-if="isSubmitting" class="spinner-border spinner-border-sm"></span>
+          {{ isSubmitting ? 'Registrando...' : 'Registrarse' }}
+        </b-button>
+        <b-button type="reset" variant="danger" :disabled="isSubmitting">Vaciar</b-button>
       </div>
     </b-form>
+
+    <div class="mt-3 text-center">¿Ya tienes cuenta? <router-link to="/login">Inicia Sesión</router-link></div>
   </div>
 </template>
 
 <script>
+import AuthService from '@/services/auth/AuthService'; // Importamos el servicio
+
 export default {
-  name: "RegisterUserPage",
+  name: 'RegisterUserPage',
   data() {
     return {
       form: {
-        nombre: "",
-        apellidos: "",
-        username: "",
-        email: "",
-        password: "",
-        retype_password: "",
+        name: '',
+        surname: '',
+        username: '',
+        email: '',
+        password: '',
+        retype_password: '',
         rol: null,
-        token: "",
+        token: '', // Token de profesor
       },
-      rol: [{ text: "¿Qué eres?", value: null }, "Profesor", "Alumno"],
-      tokenError: false,
-      show: true,
+      rolOptions: [
+        { text: '¿Qué eres?', value: null, disabled: true },
+        { text: 'Alumno', value: 1 }, // Valor 1 para Alumno
+        { text: 'Profesor', value: 2 }, // Valor 2 para Profesor
+      ],
+      message: '',
+      isError: false,
+      isSubmitting: false,
+      showForm: true,
     };
   },
   computed: {
+    // Validación de formato de email
     emailState() {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Expresión regular para validar email
-      if (this.form.email === "") {
-        return null;
-      }
+      if (!this.form.email && !this.isSubmitting) return null; // No validar si vacío (a menos que se envíe)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(this.form.email);
     },
-    // Devuelve el estado del campo: true (válido), false (inválido), null (sin validar)
+    // Validación de coincidencia de contraseñas
     passwordState() {
-      if (this.form.password === "" || this.form.retype_password === "") {
-        return null; // No se ha introducido ninguna contraseña
-      }
-      return this.form.password === this.form.retype_password; // true si coinciden, false si no
+      if (!this.form.password && !this.form.retype_password) return null;
+      if (!this.form.password || !this.form.retype_password) return null; // No valida si falta uno
+      return this.form.password === this.form.retype_password;
+    },
+    // Estado visual para token
+    tokenFieldState() {
+      if (this.form.rol !== 2) return null;
+      return null;
     },
   },
   methods: {
     async onSubmit() {
+      this.message = '';
+      this.isError = false;
+
+      // Validaciones Frontend mejoradas
       if (!this.emailState) {
-        alert("El correo electrónico no es válido.");
+        this.message = 'El correo electrónico no tiene un formato válido.';
+        this.isError = true;
         return;
       }
-      // Valida antes de enviar
       if (this.passwordState === false) {
-        alert(
-          "Las contraseñas no coinciden. Corrige los errores antes de continuar."
-        );
+        this.message = 'Las contraseñas introducidas no coinciden.';
+        this.isError = true;
         return;
       }
-      if (
-        this.form.rol === "Profesor" &&
-        this.form.token !== "3rhb23uydb238ry6g2429hrh"
-      ) {
-        this.tokenError = true; //Muestra mensaje de error sino es correcto el token
+      if (this.form.rol === null) {
+        this.message = 'Debes seleccionar un Rol (Alumno o Profesor).';
+        this.isError = true;
         return;
       }
-      this.tokenError = false;
+      if (this.form.rol === 2 && !this.form.token) {
+        // Comparamos con el valor numérico 2
+        this.message = 'Se requiere el token de validación para registrarse como Profesor.';
+        this.isError = true;
+        return;
+      }
 
-      //Enviamos datos al backend
+      // Llamada al Servicio AuthService
+      this.isSubmitting = true;
       try {
-        const response = await fetch("http://localhost:3000/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(this.form),
-        });
-        const data = await response.json();
+        const userData = { ...this.form };
+        delete userData.retype_password; // No enviar la confirmación de contraseña
 
-        if (data.success) {
-          alert("Registro completado con éxito.");
-          this.$router.push({ name: "Inicio" });
+        //  Usamos AuthService.register en lugar de fetch
+        const response = await AuthService.register(userData);
+
+        if (response.success) {
+          this.message = response.message || 'Registro completado. Revisa tu email para validar la cuenta.';
+          this.isError = false;
+          this.showForm = false;
         } else {
-          alert("Error en el registro, porfavor revise los datos.");
+          this.message = response.message || 'Error en el registro.';
+          this.isError = true;
         }
       } catch (error) {
-        console.error("Error en la comunicación del servidor:", error);
-        alert("Error al enviar los datos.");
+        // Error en la llamada API (catch del servicio o de red)
+        console.error('Error en onSubmit de registro:', error);
+        this.message = error.response?.data?.message || error.message || 'Error de comunicación con el servidor.';
+        this.isError = true;
+      } finally {
+        this.isSubmitting = false; // Terminar estado de carga
       }
     },
+    // Método para manejar el evento de resetear el formulario
     onReset(event) {
       event.preventDefault();
-      // Reset our form values
-      this.form.nombre = "";
-      this.form.apellidos = "";
-      this.form.username = "";
-      this.form.email = "";
-      this.form.password = "";
-      this.form.retype_password = "";
+      this.form.name = '';
+      this.form.surname = '';
+      this.form.username = '';
+      this.form.email = '';
+      this.form.password = '';
+      this.form.retype_password = '';
       this.form.rol = null;
-      // Trick to reset/clear native browser form validation state
-      this.show = false;
+      this.form.token = '';
+      this.message = '';
+      this.isError = false;
+      this.showForm = false;
       this.$nextTick(() => {
-        this.show = true;
+        this.showForm = true;
       });
     },
   },
@@ -220,43 +251,15 @@ export default {
 </script>
 
 <style scoped>
-/* Contenedor del formulario */
 .form-container {
-  max-width: 500px;
-  /* Ancho máximo del formulario */
-  margin: 20px auto;
-  /* Centrado vertical y horizontal */
+  max-width: 600px;
+  margin: 30px auto;
   background-color: #ffffff;
-  /* Fondo blanco */
   border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  /* Sombra ligera */
-  padding: 30px;
-  /* Espaciado interno */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 30px 40px;
 }
-
-/* Inputs y Select */
-.b-form-input,
-.b-form-select {
-  width: 100%;
-  /* Ajusta el ancho al contenedor */
-  box-sizing: border-box;
-  /* Incluye padding en el ancho total */
-}
-
-/* Espaciado */
 .b-form-group {
-  margin-bottom: 20px;
-  /* Espaciado más uniforme */
-}
-
-/* Botones */
-.b-button {
-  font-size: 1rem;
-  padding: 0.6rem 1.2rem;
-  border-radius: 5px;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-  width: 48%;
-  /* Ajusta el ancho para que queden uno al lado del otro */
+  margin-bottom: 1.25rem;
 }
 </style>

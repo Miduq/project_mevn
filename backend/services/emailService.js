@@ -1,4 +1,4 @@
-// services/emailService.js
+// backend/services/emailService.js
 
 const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");

@@ -1,7 +1,7 @@
 // controllers/studentsTeachersRelationController.js
 
-const { Students_teachers_relation, User, Subject } = require("../models");
-const { Sequelize } = require("sequelize");
+const { Students_teachers_relation, User, Subject } = require('../models');
+const { Sequelize } = require('sequelize');
 
 // Obtener Profesores de un Alumno
 exports.getMyProfessors = async (req, res) => {
@@ -10,9 +10,7 @@ exports.getMyProfessors = async (req, res) => {
 
     // Validar que el ID sea un número
     if (isNaN(studentId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "ID de alumno inválido." });
+      return res.status(400).json({ success: false, message: 'ID de alumno inválido.' });
     }
 
     const relations = await Students_teachers_relation.findAll({
@@ -20,13 +18,13 @@ exports.getMyProfessors = async (req, res) => {
       include: [
         {
           model: User,
-          as: "teacher",
-          attributes: ["id", "name", "surname", "email"],
+          as: 'teacher',
+          attributes: ['id', 'name', 'surname', 'email'],
         },
         {
           model: Subject,
-          as: "subject",
-          attributes: ["id", "subject"],
+          as: 'subject',
+          attributes: ['id', 'subject'],
         },
       ],
     });
@@ -40,10 +38,8 @@ exports.getMyProfessors = async (req, res) => {
 
     res.json({ success: true, professors: data });
   } catch (error) {
-    console.error("Error en getMyProfessors:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Error interno del servidor." });
+    console.error('Error en getMyProfessors:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.' });
   }
 };
 
@@ -54,16 +50,14 @@ exports.getMyStudents = async (req, res) => {
 
     // Validar que el ID sea un número
     if (isNaN(teacherId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "ID de profesor inválido." });
+      return res.status(400).json({ success: false, message: 'ID de profesor inválido.' });
     }
 
     // Verificar que el usuario autenticado es el profesor solicitado
     if (req.user.id !== parseInt(teacherId)) {
       return res.status(403).json({
         success: false,
-        message: "No tienes permiso para ver estos datos.",
+        message: 'No tienes permiso para ver estos datos.',
       });
     }
 
@@ -72,18 +66,19 @@ exports.getMyStudents = async (req, res) => {
       include: [
         {
           model: User,
-          as: "student",
-          attributes: ["id", "name", "surname", "email"],
+          as: 'student',
+          attributes: ['id', 'name', 'surname', 'email'],
         },
         {
           model: Subject,
-          as: "subject",
-          attributes: ["id", "subject"],
+          as: 'subject',
+          attributes: ['id', 'subject'],
         },
       ],
     });
 
     const data = relations.map((rel) => ({
+      studentId: rel.student.id,
       name: rel.student.name,
       surname: rel.student.surname,
       email: rel.student.email,
@@ -93,10 +88,8 @@ exports.getMyStudents = async (req, res) => {
 
     res.json({ success: true, students: data });
   } catch (error) {
-    console.error("Error en getMyStudents:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Error interno del servidor." });
+    console.error('Error en getMyStudents:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.' });
   }
 };
 
@@ -107,26 +100,24 @@ exports.getSubjectsTeacher = async (req, res) => {
 
     // Validar que el ID sea un número
     if (isNaN(teacherId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "ID de profesor inválido." });
+      return res.status(400).json({ success: false, message: 'ID de profesor inválido.' });
     }
 
     // Usar Sequelize para contar
     const results = await Students_teachers_relation.findAll({
       where: { id_teacher: teacherId },
       attributes: [
-        [Sequelize.col("subject.subject"), "subject"],
-        [Sequelize.fn("COUNT", Sequelize.col("id_student")), "totalStudents"],
+        [Sequelize.col('subject.subject'), 'subject'],
+        [Sequelize.fn('COUNT', Sequelize.col('id_student')), 'totalStudents'],
       ],
       include: [
         {
           model: Subject,
-          as: "subject",
+          as: 'subject',
           attributes: [],
         },
       ],
-      group: ["subject.id", "subject.subject"],
+      group: ['subject.id', 'subject.subject'],
       raw: true,
     });
 
@@ -137,10 +128,8 @@ exports.getSubjectsTeacher = async (req, res) => {
 
     res.json({ success: true, subjects: data });
   } catch (error) {
-    console.error("Error en getSubjectsTeacher:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Error interno del servidor." });
+    console.error('Error en getSubjectsTeacher:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.' });
   }
 };
 exports.getRelationsForStudent = async (req, res) => {
@@ -149,46 +138,36 @@ exports.getRelationsForStudent = async (req, res) => {
 
     // Validar que el ID sea un número
     if (isNaN(studentId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "ID de alumno inválido." });
+      return res.status(400).json({ success: false, message: 'ID de alumno inválido.' });
     }
+    const studentIdParsed = parseInt(studentId);
 
     const relations = await Students_teachers_relation.findAll({
-      where: { id_student: studentId },
+      where: { id_student: studentIdParsed },
       include: [
         {
           model: User,
-          as: "teacher", // Asegúrate que 'teacher' es el alias correcto en tu modelo Students_teachers_relation
-          attributes: ["id", "name", "surname"], // Campos necesarios del profesor
+          as: 'teacher',
+          attributes: ['id', 'name', 'surname'], // Campos necesarios del profesor
         },
         {
           model: Subject,
-          as: "subject", // Asegúrate que 'subject' es el alias correcto
-          attributes: ["id", "subject"], // Campos necesarios de la asignatura
+          as: 'subject',
+          attributes: ['id', 'subject'], // Campos necesarios de la asignatura
         },
       ],
-      // Importante: Devolver el objeto completo, incluyendo el ID de la relación
-      // para poder usarlo al borrar. El map no es necesario aquí si el frontend
-      // puede manejar la estructura anidada.
     });
-
-    // Devolvemos directamente las relaciones encontradas.
     // El frontend usará relation.id, relation.subject.subject, relation.teacher.name, etc.
     res.json({ success: true, relations: relations });
   } catch (error) {
-    console.error("Error en getRelationsForStudent:", error);
+    console.error('Error en getRelationsForStudent:', error);
     res.status(500).json({
       success: false,
-      message: "Error interno del servidor al obtener relaciones.",
+      message: 'Error interno del servidor al obtener relaciones.',
     });
   }
 };
 
-/**
- * Añadir una nueva relación entre estudiante, profesor y asignatura.
- * Necesario para el botón "Añadir Asignatura" en la página de edición.
- */
 exports.addRelation = async (req, res) => {
   try {
     const { studentId, teacherId, subjectId } = req.body;
@@ -197,11 +176,9 @@ exports.addRelation = async (req, res) => {
     if (!studentId || !teacherId || !subjectId) {
       return res.status(400).json({
         success: false,
-        message: "Faltan IDs de estudiante, profesor o asignatura.",
+        message: 'Faltan IDs de estudiante, profesor o asignatura.',
       });
     }
-
-    // Opcional: Validar que los IDs existen en sus respectivas tablas (User, Subject)
 
     // Verificar si la relación exacta ya existe para evitar duplicados
     const existingRelation = await Students_teachers_relation.findOne({
@@ -216,8 +193,7 @@ exports.addRelation = async (req, res) => {
       // 409 Conflict indica que el recurso ya existe
       return res.status(409).json({
         success: false,
-        message:
-          "Esta relación asignatura-profesor ya existe para este alumno.",
+        message: 'Esta relación asignatura-profesor ya existe para este alumno.',
       });
     }
 
@@ -231,27 +207,21 @@ exports.addRelation = async (req, res) => {
     // 201 Created indica que se creó un recurso con éxito
     res.status(201).json({ success: true, relation: newRelation });
   } catch (error) {
-    console.error("Error en addRelation:", error);
+    console.error('Error en addRelation:', error);
     res.status(500).json({
       success: false,
-      message: "Error interno del servidor al añadir la relación.",
+      message: 'Error interno del servidor al añadir la relación.',
     });
   }
 };
 
-/**
- * Eliminar una relación específica por su ID.
- * Necesario para el botón "Quitar" junto a cada asignatura en la página de edición.
- */
 exports.deleteRelation = async (req, res) => {
   try {
     const { relationId } = req.params;
 
     // Validar que el ID sea un número
     if (isNaN(relationId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "ID de relación inválido." });
+      return res.status(400).json({ success: false, message: 'ID de relación inválido.' });
     }
 
     // Intentar eliminar la relación por su clave primaria (id)
@@ -261,18 +231,16 @@ exports.deleteRelation = async (req, res) => {
 
     // destroy devuelve el número de filas eliminadas. Si es 0, no se encontró.
     if (result === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Relación no encontrada." });
+      return res.status(404).json({ success: false, message: 'Relación no encontrada.' });
     }
 
     // Éxito si se eliminó al menos una fila (debería ser solo 1 por ID)
-    res.json({ success: true, message: "Relación eliminada correctamente." });
+    res.json({ success: true, message: 'Relación eliminada correctamente.' });
   } catch (error) {
-    console.error("Error en deleteRelation:", error);
+    console.error('Error en deleteRelation:', error);
     res.status(500).json({
       success: false,
-      message: "Error interno del servidor al eliminar la relación.",
+      message: 'Error interno del servidor al eliminar la relación.',
     });
   }
 };

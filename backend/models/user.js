@@ -1,4 +1,4 @@
-// user.js
+// backend/models/user.js
 
 "use strict";
 const { Model, DataTypes } = require("sequelize");
@@ -22,6 +22,14 @@ module.exports = (sequelize) => {
       User.hasMany(models.Students_teachers_relation, {
         foreignKey: "id_student",
         as: "teachersRelations",
+      });
+
+      // Relacionamos con la tabla 'subjects' a través de 'teachers_subjects'
+      User.belongsToMany(models.Subject, {
+        through: models.TeacherSubject,
+        foreignKey: "id_teacher",
+        otherKey: "id_subject",
+        as: "teacherSubjects",
       });
     }
   }

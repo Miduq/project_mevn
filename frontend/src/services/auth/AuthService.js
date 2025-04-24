@@ -1,12 +1,11 @@
 // frontend/src/services/auth/AuthService.js
-import apiClient from "../apiClient";
+import apiClient from '../apiClient';
 
 // Función interna para manejar el logout
 const performLogout = () => {
-  localStorage.removeItem("token");
-  console.log("Servicio logout: Token eliminado");
+  localStorage.removeItem('token');
   window.dispatchEvent(
-    new CustomEvent("auth-change", {
+    new CustomEvent('auth-change', {
       detail: { isLoggedIn: false },
     })
   );
@@ -15,14 +14,14 @@ const performLogout = () => {
 // Función para iniciar sesión
 const login = async (username, password) => {
   try {
-    const response = await apiClient.post("/auth/login", {
+    const response = await apiClient.post('/auth/login', {
       username,
       password,
     });
     if (response.data.success && response.data.token) {
-      localStorage.setItem("token", response.data.token);
+      localStorage.setItem('token', response.data.token);
       window.dispatchEvent(
-        new CustomEvent("auth-change", {
+        new CustomEvent('auth-change', {
           detail: { isLoggedIn: true },
         })
       );
@@ -31,14 +30,11 @@ const login = async (username, password) => {
       // Si no fue exitoso o no vino el token según el backend
       return {
         success: false,
-        message: response.data.message || "Login fallido desde el backend.",
+        message: response.data.message || 'Login fallido desde el backend.',
       };
     }
   } catch (error) {
-    console.error(
-      "Error en servicio login:",
-      error.response?.data || error.message
-    );
+    console.error('Error en servicio login:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -46,13 +42,10 @@ const login = async (username, password) => {
 // Función para registrar un nuevo usuario
 const register = async (userData) => {
   try {
-    const response = await apiClient.post("/auth/register", userData);
+    const response = await apiClient.post('/auth/register', userData);
     return response.data;
   } catch (error) {
-    console.error(
-      "Error en servicio register:",
-      error.response?.data || error.message
-    );
+    console.error('Error en servicio register:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -60,20 +53,12 @@ const register = async (userData) => {
 // Función para obtener datos del usuario logueado
 const getMe = async () => {
   try {
-    const response = await apiClient.get("/auth/me");
+    const response = await apiClient.get('/auth/me');
     return response.data;
   } catch (error) {
-    console.error(
-      "Error en servicio getMe:",
-      error.response?.data || error.message
-    );
-    if (
-      error.response &&
-      (error.response.status === 401 || error.response.status === 403)
-    ) {
-      console.warn(
-        "Error 401/403 detectado en getMe. Realizando logout automático."
-      );
+    console.error('Error en servicio getMe:', error.response?.data || error.message);
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      console.warn('Error 401/403 detectado en getMe. Realizando logout automático.');
       performLogout();
     }
     throw error;
@@ -88,21 +73,36 @@ const logout = () => {
 // Función para subir foto de perfil
 const uploadProfilePicture = async (userId, formData) => {
   try {
-    const response = await apiClient.put(
-      `/users/${userId}/profile-picture`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
+    const response = await apiClient.put(`/users/${userId}/profile-picture`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   } catch (error) {
-    console.error(
-      `Error en servicio uploadProfilePicture para user ${userId}:`,
-      error.response?.data || error.message
-    );
+    console.error(`Error en servicio uploadProfilePicture para user ${userId}:`, error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Recuperar contraseña
+const recoverPassword = async (email) => {
+  try {
+    const response = await apiClient.post('/auth/recover-password', { email });
+    return response.data;
+  } catch (error) {
+    console.error('Error en AuthService.recoverPassword:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Resetear contraseña ---
+const resetPassword = async (resetData) => {
+  try {
+    const response = await apiClient.post('/auth/reset-password', resetData);
+    return response.data;
+  } catch (error) {
+    console.error('Error en AuthService.resetPassword:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -114,4 +114,6 @@ export default {
   getMe,
   logout,
   uploadProfilePicture,
+  recoverPassword,
+  resetPassword,
 };

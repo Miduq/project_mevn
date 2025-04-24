@@ -1,3 +1,5 @@
+<!-- src/views/password-reset/ResetPasswordPage.vue -->
+
 <template>
   <div class="container mt-5">
     <h2 class="text-center">Cambiar Contraseña</h2>
@@ -55,7 +57,7 @@ export default {
   },
   created() {
     // Obtener el token del PARÁMETRO DE RUTA
-    this.token = this.$route.params.token;
+    this.token = this.$route.query.token;
     if (!this.token) {
       this.errorMessage = "Token no encontrado o inválido en la URL.";
       console.error("No se encontró el token en los parámetros de la ruta.");
@@ -80,22 +82,26 @@ export default {
         return; // Salir si no hay token
       }
 
-      try {
-        const payload = { password: this.password };
-        const data = await AuthService.resetPassword(this.token, payload);
+      const resetData = {
+        token: this.token,
+        newPassword: this.password,
+      };
 
-        if (data.success) {
+      try {
+        const response = await AuthService.resetPassword(resetData);
+
+        if (response.success) {
           this.successMessage =
-            data.message || "Contraseña actualizada correctamente.";
+            response.message || "Contraseña actualizada correctamente.";
           this.password = ""; // Limpiar
           this.confirmPassword = "";
           // Redirigir al Login tras un breve lapso de tiempo
           setTimeout(() => {
-            this.$router.push("/");
+            this.$router.push({ name: "LoginPage" });
           }, 3000); // Espera 3 segundos
         } else {
           this.errorMessage =
-            data.message ||
+            response.message ||
             "Error al actualizar la contraseña (respuesta no exitosa).";
         }
       } catch (error) {

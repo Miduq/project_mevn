@@ -21,34 +21,29 @@
         <router-link to="/subjects">Gestionar Asignaturas</router-link>
       </li>
       <li v-if="isLoggedIn">
-        <a href="#" @click.prevent="handleLogout">Cerrar Sesión</a>
+        <a href="#" @click.prevent="logoutAndRedirect()">Cerrar Sesión</a>
       </li>
     </ul>
   </nav>
 </template>
 
-<script>
-export default {
-  name: "Navbar",
-  props: {
-    // Propiedad para recibir el estado de autenticación desde el padre (App.vue)
-    isLoggedIn: {
-      type: Boolean,
-      required: true,
-    },
-    userRole: {
-      type: Number,
-      default: null,
-    },
+<script setup>
+import { defineProps } from 'vue';
+import { useAuth } from '@/composables/useAuth';
+
+// Definir las props que recibe el componente
+const props = defineProps({
+  isLoggedIn: {
+    type: Boolean,
+    required: true,
   },
-  emits: ["logout"], // Declara el evento que este componente puede emitir
-  methods: {
-    handleLogout() {
-      // Emite el evento 'logout' hacia el componente padre (App.vue)
-      this.$emit("logout");
-    },
+  userRole: {
+    type: Number,
+    default: null,
   },
-};
+});
+
+const { logoutAndRedirect } = useAuth();
 </script>
 
 <style scoped>
@@ -85,10 +80,10 @@ nav ul li a.router-link-exact-active {
 }
 
 /* Estilo específico para el enlace de logout */
-nav ul li a[href="#"] {
+nav ul li a[href='#'] {
   color: #dc3545; /* Color rojo para logout */
 }
-nav ul li a[href="#"]:hover {
+nav ul li a[href='#']:hover {
   color: #c82333; /* Rojo más oscuro al pasar el ratón */
 }
 </style>

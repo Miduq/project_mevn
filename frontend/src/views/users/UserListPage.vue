@@ -1,493 +1,355 @@
 <!-- frontend/src/views/users/UserListPage.vue -->
 
 <template>
-  <div class="user-list container mt-4">
+  <div class="user-list-container container mt-4">
     <h2>Lista de Alumnos</h2>
-    <div class="search-container input-group mb-3">
-      <input
-        type="text"
-        v-model="searchQuery"
-        @keyup.enter="searchUsers"
-        placeholder="Buscar alumno por nombre o correo..."
-        class="form-control search-input"
-        aria-label="Buscar alumno"
-      />
-      <button
-        @click="searchUsers"
-        class="btn btn-outline-primary search-button"
-        type="button"
-      >
-        <i class="bi bi-search"></i> Buscar
-      </button>
-      <button
-        v-if="isSearchResults"
-        @click="loadInitialStudents"
-        class="btn btn-outline-secondary"
-        type="button"
-        title="Mostrar todos"
-      >
-        <i class="bi bi-x-lg"></i> Limpiar
-      </button>
-    </div>
-    <div v-if="loading" class="alert alert-info">
-      <span
-        class="spinner-border spinner-border-sm"
-        role="status"
-        aria-hidden="true"
-      ></span>
-      Cargando usuarios...
-    </div>
-    <div v-if="errorMessage" class="alert alert-danger">
-      {{ errorMessage }}
-    </div>
-    <div v-if="!loading && !errorMessage">
-      <table class="table table-striped table-hover">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Apellidos</th>
-            <th>Email</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="users.length === 0">
-            <td colspan="5" class="text-center fst-italic">
-              {{
-                isSearchResults
-                  ? "No se encontraron alumnos con esos criterios."
-                  : "No hay alumnos registrados."
-              }}
-            </td>
-          </tr>
-          <tr v-for="user in users" :key="user.id">
-            <td>{{ user.id }}</td>
-            <td>{{ user.name }}</td>
-            <td>{{ user.surname }}</td>
-            <td>{{ user.email }}</td>
-            <td>
-              <button
-                class="btn btn-sm btn-success"
-                @click="openAssignModal(user)"
-                :disabled="showAssignModal"
-              >
-                <i class="bi bi-journal-plus"></i> Asignar Asignatura
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div v-if="showAssignModal" class="assign-modal-backdrop">
-      <div class="assign-modal-content">
-        <h3>
-          Asignar Asignatura a {{ studentToAssign?.name }}
-          {{ studentToAssign?.surname }}
-        </h3>
-        <hr />
 
-        <div v-if="isLoadingProfessorSubjects">
-          Cargando asignaturas del profesor...
-        </div>
-        <div v-if="assignErrorMessage" class="alert alert-danger">
-          {{ assignErrorMessage }}
-        </div>
-
-        <div v-if="!isLoadingProfessorSubjects && !assignErrorMessage">
-          <form @submit.prevent="submitAssignment">
-            <div class="mb-3">
-              <label for="subjectSelect" class="form-label"
-                >Selecciona la asignatura:</label
-              >
-              <select
-                class="form-select"
-                id="subjectSelect"
-                v-model="selectedSubjectId"
-                required
-              >
-                <option :value="null" disabled>
-                  -- Seleccione una asignatura --
-                </option>
-                <option
-                  v-for="subj in professorSubjects"
-                  :key="subj.id"
-                  :value="subj.id"
-                >
-                  {{ subj.subject }}
-                </option>
-              </select>
-            </div>
-
-            <p
-              v-if="selectedSubjectId !== null"
-              style="font-size: 0.8em; color: grey"
-            >
-              ID Seleccionado: {{ selectedSubjectId }}
-            </p>
-
-            <div class="mt-3">
-              <button
-                type="submit"
-                class="btn btn-primary me-2"
-                :disabled="selectedSubjectId === null || isAssigning"
-              >
-                <span
-                  v-if="isAssigning"
-                  class="spinner-border spinner-border-sm"
-                ></span>
-                {{ isAssigning ? "Asignando..." : "Confirmar Asignación" }}
-              </button>
-              <button
-                type="button"
-                class="btn btn-secondary"
-                @click="closeAssignModal"
-                :disabled="isAssigning"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-        <div v-else-if="!isLoadingProfessorSubjects && assignErrorMessage">
-          <button class="btn btn-secondary" @click="closeAssignModal">
-            Cerrar
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <div class="input-group">
+          <input
+            type="text"
+            class="form-control"
+            v-model="searchQuery"
+            @keyup.enter="handleSearchNow"
+            :disabled="isLoadingSearch"
+            placeholder="Buscar..."
+          />
+          <button class="btn btn-primary" @click="handleSearchNow" :disabled="isLoadingSearch">
+            <span v-if="isLoadingSearch" class="spinner-border spinner-border-sm"></span>
+            <i v-else class="bi bi-search"></i> Buscar
+          </button>
+          <button
+            v-if="isSearchResults"
+            @click="
+              () => {
+                searchQuery = '';
+                handleSearchNow();
+              }
+            "
+            class="btn btn-outline-secondary"
+            type="button"
+            title="Mostrar todos"
+          >
+            <i class="bi bi-x-lg"></i> Limpiar
           </button>
         </div>
+        <div v-if="searchError" class="alert alert-danger mt-2 p-2">{{ searchError }}</div>
       </div>
     </div>
+
+    <div v-if="searchError && (!users || users.length === 0) && !isLoadingSearch" class="alert alert-danger">
+      {{ searchError }}
+    </div>
+
+    <div class="table-responsive">
+      <b-table
+        :items="users"
+        :fields="fieldsProfesor"
+        :busy="isLoadingSearch"
+        striped
+        hover
+        responsive="sm"
+        empty-text="No se encontraron alumnos."
+        show-empty
+        class="mt-3 user-table"
+        @row-clicked="toggleAssignments"
+        tbody-tr-class="clickable-row"
+        primary-key="id"
+        details-toggle-event=""
+      >
+        <template #table-busy>
+          <div class="text-center text-info my-2">
+            <b-spinner class="align-middle"></b-spinner>
+            <strong> Cargando...</strong>
+          </div>
+        </template>
+
+        <template #cell(active)="data">
+          <span :class="['badge', data.item.active ? 'bg-success' : 'bg-danger']">
+            {{ data.item.active ? 'Sí' : 'No' }}
+          </span>
+        </template>
+
+        <template #cell(rol)="data">
+          {{ data.item.rolName || (data.item.rol === 1 ? 'Alumno' : data.item.rol === 2 ? 'Profesor' : data.item.rol) }}
+        </template>
+
+        <template #cell(actions)="data">
+          <div class="d-flex justify-content-end gap-1">
+            <button
+              v-if="data.item.rol === 1"
+              class="btn btn-sm btn-outline-primary"
+              @click.stop="openAssignModal(data.item)"
+              title="Asignar Asignatura"
+              :disabled="isLoadingDetails && selectedUser?.id === data.item.id"
+            >
+              <i class="bi bi-journal-plus"></i>
+              <span class="d-none d-md-inline ms-1">Asignar</span>
+            </button>
+            <button
+              class="btn btn-sm btn-outline-info"
+              @click.stop="toggleAssignments(data.item)"
+              :disabled="isLoadingDetails && selectedUser?.id === data.item.id"
+              :aria-expanded="data.item._showDetails ? 'true' : 'false'"
+              title="Ver/Ocultar Asignaturas Asignadas"
+            >
+              <i :class="data.item._showDetails ? 'bi bi-chevron-up' : 'bi bi-card-list'"></i>
+              <span class="d-none d-md-inline ms-1">Asignaturas</span>
+            </button>
+          </div>
+        </template>
+
+        <template #row-details="row">
+          <div v-if="row.item._showDetails && selectedUser?.id === row.item.id">
+            <div class="assignment-details p-3 bg-light border-top">
+              <h5>Asignaturas de {{ row.item.name }} {{ row.item.surname }}:</h5>
+              <div v-if="isLoadingDetails" class="text-center text-muted py-2">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>Cargando...
+              </div>
+              <div v-else-if="detailsError" class="alert alert-warning p-2">{{ detailsError }}</div>
+              <div v-else>
+                <p v-if="!assignments || assignments.length === 0" class="fst-italic text-muted mb-0">
+                  No tiene asignaturas asignadas.
+                </p>
+                <ul class="list-group list-group-flush" v-else>
+                  <li
+                    v-for="assign in assignments"
+                    :key="assign.id"
+                    class="list-group-item d-flex justify-content-between align-items-center px-0 py-1 bg-light"
+                  >
+                    <span>
+                      <strong>{{ assign.subject?.subject || '?' }}</strong>
+                      <small class="text-muted ms-2">
+                        (Prof: {{ assign.teacher?.name || '?' }} {{ assign.teacher?.surname || '' }})
+                      </small>
+                    </span>
+                    <button
+                      v-if="assign.id"
+                      class="btn btn-xs btn-outline-danger border-0"
+                      @click="removeAssignment(assign.id, row.item.id)"
+                      :disabled="isDeletingRelationId === assign.id"
+                      title="Quitar esta asignación"
+                    >
+                      <span v-if="isDeletingRelationId === assign.id" class="spinner-border spinner-border-sm"></span>
+                      <i v-else class="bi bi-trash"></i>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </template>
+      </b-table>
+    </div>
+    <AssignSubject
+      v-if="showAssignModal"
+      :student="studentToAssign"
+      :professorId="loggedInProfessorId"
+      @close="closeAssignModal"
+      @assign-success="handleAssignSuccess"
+    />
   </div>
 </template>
 
-<script>
-import UsersService from "@/services/users/UsersService";
-import RelationService from "@/services/relations/RelationService";
-import { jwtDecode } from "jwt-decode";
+<script setup>
+// 1. Imports
+import { ref, onMounted, computed, watch } from 'vue';
+import RelationService from '@/services/relations/RelationService';
+import UsersService from '@/services/users/UsersService';
+import AssignSubject from '@/components/users/AssignSubject.vue'; // Verifica ruta
+import { useFetchData } from '@/composables/useFetchData'; // Nuestro composable
+import { jwtDecode } from 'jwt-decode'; // Para obtener ID profesor
 
-export default {
-  name: "UserListPage",
-  data() {
-    return {
-      users: [],
-      searchQuery: "",
-      errorMessage: "",
-      loading: false,
-      isSearchResults: false,
-      showAssignModal: false,
-      studentToAssign: null,
-      professorSubjects: [],
-      isLoadingProfessorSubjects: false,
-      selectedSubjectId: null,
-      isAssigning: false,
-      assignErrorMessage: "",
-    };
-  },
-  methods: {
-    // Método para que la lista no aparezca vacia
-    async loadInitialStudents() {
-      this.loading = true;
-      this.errorMessage = "";
-      this.users = [];
-      this.searchQuery = ""; // Limpia la búsqueda
-      this.isSearchResults = false; // Marcar que no son resultados de búsqueda
-      try {
-        // Llama a la nueva función del servicio de usuarios
-        const response = await UsersService.getStudents();
-        if (response && response.success) {
-          this.users = response.students; // Asigna la lista de alumnos
-        } else {
-          this.errorMessage =
-            response.message || "Error al cargar la lista de alumnos.";
-        }
-      } catch (error) {
-        console.error("Error al cargar alumnos:", error);
-        this.errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Ocurrió un error al cargar los alumnos.";
-      } finally {
-        this.loading = false;
-      }
-    },
+// 3. Búsqueda y Lista de Usuarios (usando useFetchData)
+const searchQuery = ref('');
+const isSearchResults = ref(false);
+const {
+  data: users,
+  isLoading: isLoadingSearch,
+  error: searchError,
+  execute: fetchUsers,
+} = useFetchData(UsersService.searchUsers, { initialData: [], dataKey: 'users' });
 
-    async searchUsers() {
-      if (!this.searchQuery.trim()) {
-        this.errorMessage = "Por favor, ingresa un término de búsqueda.";
-        this.loadInitialStudents();
-        return;
-      }
+// Carga inicial al montar
+onMounted(() => {
+  isSearchResults.value = false; // Asegurar estado inicial
+  fetchUsers('');
+});
 
-      this.loading = true;
-      this.errorMessage = "";
-      this.users = [];
-      this.isSearchResults = true;
-
-      try {
-        const response = await UsersService.searchUsers(this.searchQuery);
-        if (response.success) {
-          // Filtramos para mostrar solo alumnos en los resultados de búsqueda también
-          // Asegúrate que el ID de rol de alumno es 1
-          this.users = response.users.filter((user) => user.rol === 1);
-          if (this.users.length === 0) {
-            this.errorMessage =
-              "No se encontraron alumnos con los criterios de búsqueda proporcionados.";
-          }
-        } else {
-          this.errorMessage =
-            response.message || "Error al buscar los usuarios.";
-        }
-      } catch (error) {
-        console.error("Error al buscar usuarios:", error);
-        this.errorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Ocurrió un error al buscar los usuarios.";
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async openAssignModal(student) {
-      this.studentToAssign = student;
-      this.assignErrorMessage = "";
-      this.professorSubjects = [];
-      this.selectedSubjectId = null;
-      this.isLoadingProfessorSubjects = true;
-      this.showAssignModal = true; // Muestra el modal
-
-      try {
-        // Obtener ID del profesor logueado desde el token
-        const token = localStorage.getItem("token");
-        if (!token) throw new Error("Token no encontrado");
-        const decodedToken = jwtDecode(token);
-        const professorId = decodedToken.id;
-
-        if (!professorId)
-          throw new Error("No se pudo obtener el ID del profesor del token");
-
-        // Llama al servicio para obtener las asignaturas de ESE profesor
-        const response = await UsersService.getProfessorSubjectList(
-          professorId
-        );
-
-        if (response && response.success) {
-          console.warn("Respuesta de getSubjectsTeacher:", response.subjects);
-          this.professorSubjects = response.subjects;
-          if (
-            response.subjects.length > 0 &&
-            typeof response.subjects[0].id === "undefined"
-          ) {
-            console.error(
-              "getSubjectsTeacher no devuelve ID de asignatura, se necesita ajustar backend/servicio o usar otra llamada."
-            );
-            this.assignErrorMessage =
-              "Error: No se pudo obtener la lista completa de asignaturas del profesor.";
-            this.professorSubjects = []; // Vacío
-            // *** Simulación temporal para ver el modal ***
-            this.professorSubjects = response.subjects.map((s, index) => ({
-              id: index + 1000,
-              subject: s.subject,
-            })); // QUITAR ESTO LUEGO
-          } else {
-            this.professorSubjects = response.subjects; // Si ya devuelve id y subject/name, esto estaría bien
-          }
-        } else {
-          this.assignErrorMessage =
-            response.message || "Error al cargar las asignaturas del profesor.";
-        }
-      } catch (error) {
-        console.error("Error en openAssignModal:", error);
-        this.assignErrorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Ocurrió un error al preparar la asignación.";
-      } finally {
-        this.isLoadingProfessorSubjects = false; // Termina la carga
-      }
-    },
-    closeAssignModal() {
-      this.showAssignModal = false;
-      this.studentToAssign = null;
-      this.professorSubjects = [];
-      this.selectedSubjectId = null;
-      this.assignErrorMessage = "";
-      this.isAssigning = false;
-    },
-
-    // Método para manejar el envío del formulario
-    async submitAssignment() {
-      console.log("Submit assignment triggered!");
-      this.assignErrorMessage = "";
-
-      if (this.selectedSubjectId === null || !this.studentToAssign) {
-        this.assignErrorMessage = "Por favor, selecciona una asignatura.";
-        return;
-      }
-
-      this.isAssigning = true; // Iniciar estado de carga
-
-      try {
-        // Obtener ID del profesor logueado desde el token
-        const token = localStorage.getItem("token");
-        if (!token)
-          throw new Error(
-            "Token no encontrado. Por favor, inicia sesión de nuevo."
-          );
-        const decodedToken = jwtDecode(token);
-        const professorId = decodedToken.id;
-        if (!professorId)
-          throw new Error("No se pudo obtener el ID del profesor del token.");
-
-        const relationData = {
-          studentId: this.studentToAssign.id,
-          subjectId: this.selectedSubjectId,
-          teacherId: professorId,
-        };
-
-        console.log("Enviando datos de asignación al backend:", relationData);
-
-        const response = await RelationService.addRelation(relationData);
-
-        console.log("Respuesta del backend a addRelation:", response);
-
-        // Maneja la respuesta del backend
-        if (response && response.success) {
-          alert(
-            `Asignatura asignada correctamente al alumno ${this.studentToAssign.name}.`
-          );
-          this.closeAssignModal();
-        } else {
-          this.assignErrorMessage =
-            response.message || "El backend indicó un error al asignar.";
-        }
-      } catch (error) {
-        // Error en la llamada API
-        console.error("Error al asignar asignatura:", error);
-        // Intenta mostrar el mensaje de error específico del backend si existe
-        this.assignErrorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Error desconocido al asignar la asignatura.";
-      } finally {
-        this.isAssigning = false;
-      }
-    },
-  },
-
-  mounted() {
-    console.log("UserListPage montado. Cargando lista inicial de alumnos...");
-    this.loadInitialStudents();
-  },
+// Lógica de búsqueda (manual + debounce)
+let debounceTimer = null;
+const handleSearchNow = () => {
+  isSearchResults.value = !!searchQuery.value && searchQuery.value.trim() !== '';
+  fetchUsers(searchQuery.value);
 };
+watch(searchQuery, (newValue) => {
+  clearTimeout(debounceTimer);
+  if (newValue.length > 2 || newValue.length === 0) {
+    debounceTimer = setTimeout(() => {
+      isSearchResults.value = !!newValue && newValue.trim() !== '';
+      fetchUsers(newValue);
+    }, 500);
+  }
+});
+
+// 4. Lógica Modal Asignar Asignatura
+const studentToAssign = ref(null);
+const showAssignModal = computed(() => studentToAssign.value !== null);
+const loggedInProfessorId = computed(() => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    return jwtDecode(token).id;
+  } catch {
+    return null;
+  }
+});
+const openAssignModal = (student) => {
+  studentToAssign.value = student;
+};
+const closeAssignModal = () => {
+  studentToAssign.value = null;
+};
+
+// 5. Lógica para Detalles de Asignaturas
+const selectedUser = ref(null); // Usuario seleccionado
+// Composable para los detalles (sin cambios)
+const {
+  data: assignments,
+  isLoading: isLoadingDetails,
+  error: detailsError,
+  execute: fetchAssignmentsForStudent,
+} = useFetchData((studentId) => RelationService.getRelationsForStudent(studentId), {
+  initialData: [],
+  dataKey: 'relations',
+});
+
+// Función toggleAssignments (simplificada)
+const toggleAssignments = async (userRowItem) => {
+  // Busca el item reactivo correspondiente en nuestro array 'users'
+  const itemInState = users.value.find((u) => u.id === userRowItem.id);
+  if (!itemInState) {
+    return;
+  }
+
+  const isOpening = !itemInState._showDetails; // Determina si vamos a abrir o cerrar
+
+  // --- Lógica para cerrar otras filas (Opcional pero recomendado) ---
+  if (isOpening) {
+    users.value.forEach((u) => {
+      if (u.id !== itemInState.id && u._showDetails) {
+        u._showDetails = false; // Cierra las demás
+      }
+    });
+  }
+
+  // Alterna el estado _showDetails del item actual (esto controla b-table)
+  itemInState._showDetails = !itemInState._showDetails;
+
+  // Actualiza 'selectedUser' y carga datos
+  if (itemInState._showDetails) {
+    selectedUser.value = itemInState;
+    // Limpiar antes de cargar por si acaso
+    detailsError.value = null;
+    await fetchAssignmentsForStudent(itemInState.id); // Carga los datos usando el composable
+  } else {
+    // Si estamos CERRANDO, simplemente deseleccionamos
+    selectedUser.value = null;
+  }
+};
+
+// --- Lógica handleAssignSuccess (Ahora usa fetchAssignmentsForStudent) ---
+const handleAssignSuccess = async () => {
+  const currentlySelectedStudentId = selectedUser.value?.id;
+  const assignedStudentId = studentToAssign.value?.id;
+  closeAssignModal();
+  if (currentlySelectedStudentId && currentlySelectedStudentId === assignedStudentId) {
+    await fetchAssignmentsForStudent(currentlySelectedStudentId); // <-- Llama al execute del composable
+  }
+};
+
+// 6. Definición de campos para las tablas b-table
+const fieldsProfesor = [
+  // Asumiendo que esta página lista ALUMNOS
+  { key: 'name', label: 'Nombre Alumno', sortable: true },
+  { key: 'surname', label: 'Apellidos Alumno', sortable: true },
+  { key: 'email', label: 'Email Alumno' },
+  { key: 'active', label: 'Activo', sortable: true, class: 'text-center', thClass: 'text-center' }, // Añadido activo y centrado
+  {
+    key: 'actions',
+    label: 'Acciones',
+    class: 'text-center',
+    tdClass: 'text-center',
+    thClass: 'text-center',
+  },
+];
+
+// 7. Lógica para Eliminar Asignación (desde los detalles)
+const isDeletingRelationId = ref(null); // Para el spinner del botón borrar asignación
+
+async function removeAssignment(relationId, studentId) {
+  // Esta función ya estaba bien, solo necesita llamar a fetchAssignmentsForStudent al final
+  const student = users.value.find((u) => u.id === studentId);
+  const studentName = student ? `${student.name} ${student.surname}` : `ID ${studentId}`;
+  const assignment = assignments.value.find((a) => a.id === relationId); // Usa assign.id de la relación
+  const subjectName = assignment?.subject?.subject || 'esta asignatura';
+
+  if (!window.confirm(`¿Seguro que quieres quitar ${subjectName} al alumno ${studentName}?`)) {
+    return;
+  }
+
+  isDeletingRelationId.value = relationId;
+  detailsError.value = '';
+
+  try {
+    const response = await RelationService.deleteRelation(relationId);
+    if (response && response.success) {
+      alert(`Asignación de ${subjectName} eliminada.`);
+      // Refrescar detalles si el usuario afectado sigue seleccionado
+      if (selectedUser.value && selectedUser.value.id === studentId) {
+        await fetchAssignmentsForStudent(studentId); // <-- Llama al execute del composable
+      }
+    } else {
+      detailsError.value = response?.message || 'Error del backend al eliminar.';
+      alert(`Error al eliminar: ${detailsError.value}`);
+    }
+  } catch (error) {
+    console.error(`Error al eliminar relación ${relationId}:`, error);
+    const message = error.response?.data?.message || error.message || 'Error desconocido.';
+    detailsError.value = message;
+    alert(`Error: ${message}`);
+  } finally {
+    isDeletingRelationId.value = null; // Limpiar estado de carga
+  }
+}
 </script>
 
 <style scoped>
-.user-list {
-  max-width: 1000px;
-  margin: 20px auto;
-  text-align: center;
-  padding: 20px;
+/* Añadimos algunos estilos para la interacción y detalles */
+.user-list-container {
+  padding-bottom: 50px; /* Espacio al final */
 }
-
-.search-container {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.search-input {
-  flex: 1;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
-.search-button {
-  padding: 10px 15px;
-  border: none;
-  background-color: #007bff;
-  color: #fff;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.search-button:hover {
-  background-color: #0056b3;
-}
-
-.error-message {
-  color: red;
-  margin-bottom: 20px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
+.table-responsive {
   margin-top: 20px;
 }
-
-thead {
-  background-color: #f2f2f2;
+/* Cambia cursor para filas clicables */
+tbody tr[style*='cursor: pointer']:hover {
+  background-color: #e9ecef; /* Color suave al pasar por encima */
 }
-
-th,
-td {
-  padding: 12px 15px;
-  text-align: left;
-  vertical-align: middle;
-  border-bottom: 1px solid #ddd;
+/* Estilo para la fila seleccionada */
+.table-info {
+  --bs-table-accent-bg: var(--bs-info-bg-subtle); /* Usa variables BS5 si están disponibles */
+  /* background-color: #cfe2ff !important; */ /* Fallback */
+  font-weight: bold;
 }
-
-.edit-button {
-  padding: 5px 10px;
-  cursor: pointer;
-  background-color: #28a745;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
+/* Estilo para la celda de detalles */
+.assignment-details {
+  margin-top: -1px; /* Para que los bordes se solapen */
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
 }
-
-.edit-button:hover {
-  background-color: #218838;
-}
-
-tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-tr:hover {
-  background-color: #f1f1f1;
-}
-
-.table th:first-child,
-.table td:first-child {
-  width: 5%;
-}
-
-.table th:last-child,
-.table td:last-child {
-  width: 25%;
-  text-align: center;
-}
-.assign-modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1050; /* Asegura que esté por encima de otros elementos */
-}
-
-.assign-modal-content {
-  background-color: white;
-  padding: 20px 30px;
-  border-radius: 8px;
-  min-width: 400px; /* Ancho mínimo */
-  max-width: 600px; /* Ancho máximo */
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+.input-group .btn {
+  z-index: 0; /* Evita solapamiento visual raro con input */
 }
 </style>
