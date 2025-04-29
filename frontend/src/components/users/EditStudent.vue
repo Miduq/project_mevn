@@ -3,18 +3,11 @@
 <template>
   <div class="edit-modal-backdrop" @click.self="handleCancel">
     <div class="edit-modal-content">
-      <h3>
-        Editando Alumno: {{ formData.name }} {{ formData.surname }} (ID:
-        {{ student?.id }})
-      </h3>
+      <h3>Editando Alumno: {{ formData.name }} {{ formData.surname }} (ID: {{ student?.id }})</h3>
       <hr />
 
       <form @submit.prevent="handleSubmit">
-        <div
-          v-if="errorMessage || internalErrorMessage"
-          class="alert alert-danger p-2"
-          role="alert"
-        >
+        <div v-if="errorMessage || internalErrorMessage" class="alert alert-danger p-2" role="alert">
           {{ errorMessage || internalErrorMessage }}
         </div>
 
@@ -31,9 +24,7 @@
         </div>
 
         <div class="mb-3">
-          <label for="editStudentSurnameModal" class="form-label"
-            >Apellidos:</label
-          >
+          <label for="editStudentSurnameModal" class="form-label">Apellidos:</label>
           <input
             type="text"
             class="form-control"
@@ -57,26 +48,12 @@
         </div>
 
         <div class="text-end mt-4">
-          <button
-            type="button"
-            class="btn btn-secondary me-2"
-            @click="handleCancel"
-            :disabled="isLoading"
-          >
+          <button type="button" class="btn btn-secondary me-2" @click="handleCancel" :disabled="isLoading">
             Cancelar
           </button>
-          <button
-            type="submit"
-            class="btn btn-success"
-            :disabled="isLoading || !isFormValid"
-          >
-            <span
-              v-if="isLoading"
-              class="spinner-border spinner-border-sm"
-              role="status"
-              aria-hidden="true"
-            ></span>
-            {{ isLoading ? "Guardando..." : "Guardar Cambios" }}
+          <button type="submit" class="btn btn-success" :disabled="isLoading || !isFormValid">
+            <span v-if="isLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            {{ isLoading ? 'Guardando...' : 'Guardar Cambios' }}
           </button>
         </div>
       </form>
@@ -85,10 +62,10 @@
 </template>
 
 <script>
-import validator from "validator";
+import validator from 'validator';
 
 export default {
-  name: "EditStudent",
+  name: 'EditStudent',
   props: {
     // Recibe el objeto completo del estudiante a editar
     student: {
@@ -103,22 +80,22 @@ export default {
     // Recibe mensajes de error de la API desde el padre
     errorMessage: {
       type: String,
-      default: "",
+      default: '',
     },
   },
   // Eventos que emite al padre
-  emits: ["close", "save"],
+  emits: ['close', 'save'],
   data() {
     return {
       // Usamos formData como una copia local para no mutar la prop directamente
       formData: {
         id: null,
-        name: "",
-        surname: "",
-        email: "",
+        name: '',
+        surname: '',
+        email: '',
       },
       // Para errores de validación DENTRO del modal (si los hubiera)
-      internalErrorMessage: "",
+      internalErrorMessage: '',
     };
   },
   computed: {
@@ -137,38 +114,37 @@ export default {
         this.formData.id = this.student.studentId;
         // Usa los nombres de propiedad que vengan en 'student'
         // (Asegúrate que coinciden con lo que devuelve getMyStudents)
-        this.formData.name = this.student.name || "";
-        this.formData.surname = this.student.surname || "";
-        this.formData.email = this.student.email || "";
+        this.formData.name = this.student.name || '';
+        this.formData.surname = this.student.surname || '';
+        this.formData.email = this.student.email || '';
       } else {
         // Si no hay estudiante, resetea (no debería ocurrir si se usa v-if en el padre)
-        this.formData = { id: null, name: "", surname: "", email: "" };
+        this.formData = { id: null, name: '', surname: '', email: '' };
       }
-      this.internalErrorMessage = ""; // Limpia errores internos al (re)inicializar
+      this.internalErrorMessage = ''; // Limpia errores internos al (re)inicializar
     },
     // Se llama al enviar el formulario
     handleSubmit() {
-      this.internalErrorMessage = ""; // Limpiar error interno
+      this.internalErrorMessage = ''; // Limpiar error interno
       // Realiza validación interna antes de emitir
       if (!this.isFormValid) {
-        this.internalErrorMessage =
-          "Por favor, completa todos los campos requeridos.";
+        this.internalErrorMessage = 'Por favor, completa todos los campos requeridos.';
         return;
       }
       // Si todo está bien, emite el evento 'save' con los datos del formulario
-      console.log("EditStudentModal: Emitiendo save con data:", this.formData);
-      this.$emit("save", { ...this.formData }); // Importante enviar una copia
+      console.log('EditStudentModal: Emitiendo save con data:', this.formData);
+      this.$emit('save', { ...this.formData }); // Importante enviar una copia
     },
     // Se llama al pulsar Cancelar o clicar fuera
     handleCancel() {
-      console.log("EditStudentModal: Emitiendo close");
-      this.$emit("close");
+      console.log('EditStudentModal: Emitiendo close');
+      this.$emit('close');
     },
   },
   watch: {
     // Observador para re-inicializar el formulario si la prop 'student' cambia
     student: {
-      handler: "initializeForm", // Llama a initializeForm cuando 'student' cambie
+      handler: 'initializeForm', // Llama a initializeForm cuando 'student' cambie
       immediate: true, // Ejecuta el handler inmediatamente al montar
       deep: true, // Necesario para detectar cambios dentro del objeto
     },

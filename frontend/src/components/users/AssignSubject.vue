@@ -10,78 +10,45 @@
       <hr />
 
       <div>
-        <div v-if="isLoadingProfessorSubjects" class="alert alert-info">
-          Cargando asignaturas disponibles...
+        <div v-if="isLoadingProfessorSubjects" class="alert alert-info">Cargando asignaturas disponibles...</div>
+
+        <div v-if="assignErrorMessage" class="alert alert-danger alert-dismissible fade show p-2 mt-2" role="alert">
+          <small>{{ assignErrorMessage }}</small>
+          <button type="button" class="btn-close p-2" @click="assignErrorMessage = ''" aria-label="Cerrar"></button>
         </div>
 
-        <div v-if="assignErrorMessage" class="alert alert-danger">
-          {{ assignErrorMessage }}
-        </div>
-
-        <form
-          @submit.prevent="submitAssignment"
-          v-if="!isLoadingProfessorSubjects && !assignErrorMessage"
-        >
+        <form @submit.prevent="submitAssignment" v-if="!isLoadingProfessorSubjects && !assignErrorMessage">
           <div class="mb-3">
-            <label for="subjectSelectModal" class="form-label"
-              >Selecciona la asignatura:</label
-            >
-            <select
-              class="form-select"
-              id="subjectSelectModal"
-              v-model="selectedSubjectId"
-              required
-            >
-              <option :value="null" disabled>
-                -- Seleccione una asignatura --
-              </option>
+            <label for="subjectSelectModal" class="form-label">Selecciona la asignatura:</label>
+            <select class="form-select" id="subjectSelectModal" v-model="selectedSubjectId" required>
+              <option :value="null" disabled>-- Seleccione una asignatura --</option>
               <option v-if="professorSubjects.length === 0" disabled>
                 (No hay asignaturas disponibles para este profesor)
               </option>
-              <option
-                v-for="subj in professorSubjects"
-                :key="subj.id"
-                :value="subj.id"
-              >
+              <option v-for="subj in professorSubjects" :key="subj.id" :value="subj.id">
                 {{ subj.subject }}
               </option>
             </select>
           </div>
 
           <div class="mt-4 text-end">
-            <button
-              type="button"
-              class="btn btn-secondary me-2"
-              @click="closeModal"
-              :disabled="isAssigning"
-            >
+            <button type="button" class="btn btn-secondary me-2" @click="closeModal" :disabled="isAssigning">
               Cancelar
             </button>
             <button
               type="submit"
               class="btn btn-primary"
-              :disabled="
-                selectedSubjectId === null ||
-                isAssigning ||
-                professorSubjects.length === 0
-              "
+              :disabled="selectedSubjectId === null || isAssigning || professorSubjects.length === 0"
             >
-              <span
-                v-if="isAssigning"
-                class="spinner-border spinner-border-sm"
-              ></span>
-              {{ isAssigning ? "Asignando..." : "Confirmar Asignación" }}
+              <span v-if="isAssigning" class="spinner-border spinner-border-sm"></span>
+              {{ isAssigning ? 'Asignando...' : 'Confirmar Asignación' }}
             </button>
           </div>
         </form>
 
         <div
           class="text-end mt-3"
-          v-if="
-            !isLoadingProfessorSubjects &&
-            assignErrorMessage &&
-            professorSubjects.length === 0
-          "
+          v-if="!isLoadingProfessorSubjects && assignErrorMessage && professorSubjects.length === 0"
         >
           <button class="btn btn-secondary" @click="closeModal">Cerrar</button>
         </div>
@@ -91,16 +58,16 @@
 </template>
 
 <script>
-import UsersService from "@/services/users/UsersService";
-import RelationService from "@/services/relations/RelationService";
+import UsersService from '@/services/users/UsersService';
+import RelationService from '@/services/relations/RelationService';
 
 export default {
-  name: "AssignSubject",
+  name: 'AssignSubject',
   props: {
     student: {
       type: Object,
       required: true,
-      default: () => ({ id: null, name: "Desconocido", surname: "" }),
+      default: () => ({ id: null, name: 'Desconocido', surname: '' }),
     },
     // ID del profesor logueado. Requerido.
     professorId: {
@@ -108,7 +75,7 @@ export default {
       required: true,
     },
   },
-  emits: ["close", "assign-success"],
+  emits: ['close', 'assign-success'],
   data() {
     return {
       // Estado interno del modal
@@ -116,59 +83,43 @@ export default {
       isLoadingProfessorSubjects: false, //
       selectedSubjectId: null,
       isAssigning: false,
-      assignErrorMessage: "",
+      assignErrorMessage: '',
     };
   },
   methods: {
     closeModal() {
-      console.log("AssignSubject: Emitiendo evento close");
-      this.$emit("close");
+      this.$emit('close');
     },
 
     // Busca las asignaturas que imparte el profesor logueado
     async fetchProfessorSubjects() {
       if (!this.professorId) {
-        this.assignErrorMessage =
-          "Error interno: No se proporcionó ID del profesor.";
+        this.assignErrorMessage = 'Error interno: No se proporcionó ID del profesor.';
         console.error(this.assignErrorMessage);
         return;
       }
-      console.log(
-        `AssignSubject: Buscando asignaturas para profesor ID ${this.professorId}`
-      );
       this.isLoadingProfessorSubjects = true;
-      this.assignErrorMessage = "";
+      this.assignErrorMessage = '';
       this.professorSubjects = []; // Limpiar antes de cargar
 
       try {
         // Llama a la función del servicio de usuario que creamos
-        const response = await UsersService.getProfessorSubjectList(
-          this.professorId
-        );
+        const response = await UsersService.getProfessorSubjectList(this.professorId);
         if (response && response.success) {
           // Asigna la lista de asignaturas
           this.professorSubjects = response.subjects;
-          console.log(
-            "AssignSubject: Asignaturas del profesor cargadas:",
-            this.professorSubjects
-          );
           if (this.professorSubjects.length === 0) {
-            console.warn(
-              "AssignSubject: El profesor no tiene asignaturas asociadas."
-            );
+            console.warn('AssignSubject: El profesor no tiene asignaturas asociadas.');
           }
         } else {
           // Si la API devuelve success: false
-          this.assignErrorMessage =
-            response.message || "Error al cargar las asignaturas del profesor.";
+          this.assignErrorMessage = response.message || 'Error al cargar las asignaturas del profesor.';
         }
       } catch (error) {
         // Error en la llamada API
-        console.error("AssignSubject: Error en fetchProfessorSubjects:", error);
+        console.error('AssignSubject: Error en fetchProfessorSubjects:', error);
         this.assignErrorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Ocurrió un error al cargar las asignaturas.";
+          error.response?.data?.message || error.message || 'Ocurrió un error al cargar las asignaturas.';
       } finally {
         this.isLoadingProfessorSubjects = false;
       }
@@ -178,22 +129,20 @@ export default {
     async submitAssignment() {
       // Validación básica
       if (this.selectedSubjectId === null) {
-        this.assignErrorMessage =
-          "Por favor, selecciona una asignatura para asignar.";
+        this.assignErrorMessage = 'Por favor, selecciona una asignatura para asignar.';
         return;
       }
       if (!this.student || !this.student.id) {
-        this.assignErrorMessage =
-          "Error interno: No se especificó el estudiante.";
+        this.assignErrorMessage = 'Error interno: No se especificó el estudiante.';
         return;
       }
       if (!this.professorId) {
-        this.assignErrorMessage = "Error interno: Falta ID del profesor.";
+        this.assignErrorMessage = 'Error interno: Falta ID del profesor.';
         return;
       }
 
       this.isAssigning = true;
-      this.assignErrorMessage = "";
+      this.assignErrorMessage = '';
 
       try {
         // Prepara los datos para el servicio addRelation
@@ -202,31 +151,22 @@ export default {
           subjectId: this.selectedSubjectId,
           teacherId: this.professorId,
         };
-        console.log(
-          "AssignSubject: Enviando datos de asignación:",
-          relationData
-        );
+        console.log('AssignSubject: Enviando datos de asignación:', relationData);
 
         // Llama al servicio de relaciones
         const response = await RelationService.addRelation(relationData);
 
         if (response && response.success) {
-          alert(
-            `Asignatura asignada correctamente al alumno ${this.student.name}.`
-          );
-          this.$emit("assign-success");
+          this.$emit('assign-success');
           this.closeModal();
         } else {
-          this.assignErrorMessage =
-            response.message || "El backend indicó un error al asignar.";
+          this.assignErrorMessage = response.message || 'El backend indicó un error al asignar.';
         }
       } catch (error) {
         // Error en la llamada API
-        console.error("AssignSubject: Error al asignar asignatura:", error);
+        console.error('AssignSubject: Error al asignar asignatura:', error);
         this.assignErrorMessage =
-          error.response?.data?.message ||
-          error.message ||
-          "Error desconocido al asignar la asignatura.";
+          error.response?.data?.message || error.message || 'Error desconocido al asignar la asignatura.';
       } finally {
         this.isAssigning = false;
       }

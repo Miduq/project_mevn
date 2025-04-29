@@ -1,18 +1,18 @@
 // backend/models/teachersubject.js
 
-"use strict";
-const { Model } = require("sequelize");
+'use strict';
+const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
   class TeacherSubject extends Model {
     static associate(models) {
       TeacherSubject.belongsTo(models.User, {
-        foreignKey: "id_teacher",
-        as: "teacher",
+        foreignKey: 'id_teacher',
+        as: 'teacher',
       });
       TeacherSubject.belongsTo(models.Subject, {
-        foreignKey: "id_subject",
-        as: "subject",
+        foreignKey: 'id_subject',
+        as: 'subject',
       });
     }
   }
@@ -23,8 +23,8 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         allowNull: false,
         references: {
-          model: "users",
-          key: "id",
+          model: 'users',
+          key: 'id',
         },
       },
       id_subject: {
@@ -32,15 +32,15 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         allowNull: false,
         references: {
-          model: "subjects",
-          key: "id",
+          model: 'subjects',
+          key: 'id',
         },
       },
     },
     {
       sequelize,
-      modelName: "TeacherSubject",
-      tableName: "teachers_subjects",
+      modelName: 'TeacherSubject',
+      tableName: 'teachers_subjects',
       timestamps: false,
     }
   );

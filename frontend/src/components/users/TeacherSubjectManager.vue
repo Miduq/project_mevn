@@ -1,6 +1,6 @@
 <!-- frontend/src/components/TeacherSubjectManager.vue -->
 
-<template>
+<!--  <template>
   <div class="teacher-subject-manager mt-4 p-3 border rounded bg-light shadow-sm">
     <h4>Gestionar Mis Asignaturas Impartidas</h4>
     <hr />

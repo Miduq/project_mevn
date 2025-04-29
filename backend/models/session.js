@@ -1,14 +1,14 @@
 // session.js
 
-"use strict";
-const { Model, DataTypes } = require("sequelize");
+'use strict';
+const { Model, DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   class Session extends Model {
     static associate(models) {
       Session.belongsTo(models.User, {
-        foreignKey: "id_user", //Clave foránea en la tabla de User
-        as: "user", //Alias para la relación
+        foreignKey: 'id_user', //Clave foránea en la tabla de User
+        as: 'user', //Alias para la relación
       });
     }
   }
@@ -33,8 +33,8 @@ module.exports = (sequelize) => {
     },
     {
       sequelize,
-      modelName: "Session",
-      tableName: "session",
+      modelName: 'Session',
+      tableName: 'session',
       timestamps: false,
     }
   );

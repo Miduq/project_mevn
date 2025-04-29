@@ -196,10 +196,10 @@ exports.getProfessorSubjectList = async (req, res, next) => {
 // Actualizar usuario
 exports.updateUser = async (req, res, next) => {
   const { id } = req.params;
-  const { name, surname, email } = req.body;
+  const { name, surname, email, rol } = req.body;
   const userId = parseInt(id);
 
-  if (!name || !surname || !email) {
+  if (!name || !surname || !email || !rol) {
     return res.status(400).json({ success: false, message: 'Todos los campos son obligatorios.' });
   }
   if (!validator.isEmail(email)) {
@@ -223,13 +223,17 @@ exports.updateUser = async (req, res, next) => {
     user.name = name;
     user.surname = surname;
     user.email = email;
+    user.rol = rol;
 
-    await user.save();
+    await user.save(); // <-- El punto crítico
 
-    const userResponse = formatUserOutput(updatedUserWithRole);
-    res.json({ success: true, message: '...', user: userResponse });
+    const updatedUserWithDetails = await User.findByPk(user.id, {
+      attributes: { exclude: ['password', 'access_token', 'password_token'] },
+      include: [{ model: Role, as: 'userRole', attributes: ['id', 'role_name'] }], // Incluir Role
+    });
+    const userResponse = formatUserOutput(updatedUserWithDetails);
+    res.json({ success: true, message: 'Usuario actualizado correctamente.', user: userResponse });
   } catch (error) {
-    console.error('Error en updateUser:', error);
     next(error);
   }
 };

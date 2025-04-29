@@ -1,35 +1,35 @@
 // backend/models/user.js
 
-"use strict";
-const { Model, DataTypes } = require("sequelize");
+'use strict';
+const { Model, DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   class User extends Model {
     static associate(models) {
       // Relacionamos con la tabla 'roles'
       User.belongsTo(models.Role, {
-        foreignKey: "rol", // Clave foránea
-        as: "userRole", // Alias para la relación
+        foreignKey: 'rol', // Clave foránea
+        as: 'userRole', // Alias para la relación
       });
 
       // Relacionamos con las relaciones como profesor
       User.hasMany(models.Students_teachers_relation, {
-        foreignKey: "id_teacher",
-        as: "studentsRelations",
+        foreignKey: 'id_teacher',
+        as: 'studentsRelations',
       });
 
       // Relacionamos con las relaciones como estudiante
       User.hasMany(models.Students_teachers_relation, {
-        foreignKey: "id_student",
-        as: "teachersRelations",
+        foreignKey: 'id_student',
+        as: 'teachersRelations',
       });
 
       // Relacionamos con la tabla 'subjects' a través de 'teachers_subjects'
       User.belongsToMany(models.Subject, {
         through: models.TeacherSubject,
-        foreignKey: "id_teacher",
-        otherKey: "id_subject",
-        as: "teacherSubjects",
+        foreignKey: 'id_teacher',
+        otherKey: 'id_subject',
+        as: 'teacherSubjects',
       });
     }
   }
@@ -68,8 +68,8 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-          model: "roles",
-          key: "id",
+          model: 'roles',
+          key: 'id',
         },
       },
       access_token: {
@@ -93,8 +93,8 @@ module.exports = (sequelize) => {
     },
     {
       sequelize,
-      modelName: "User",
-      tableName: "users",
+      modelName: 'User',
+      tableName: 'users',
       timestamps: false,
     }
   );

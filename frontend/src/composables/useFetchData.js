@@ -27,7 +27,7 @@ export function useFetchData(fetcher, options = {}) {
           data.value = response[dataKey];
         } else if (dataKey === null) {
           // Si no se especificó dataKey la respuesta es el dato,
-          console.warn(`useFetchData: Respuesta exitosa pero no se especificó o encontró dataKey.`);
+          console.warn(`useFetchData: Respuesta exitosa.`);
           data.value = initialData;
         } else {
           // Si se especificó dataKey pero no vino en la respuesta exitosa

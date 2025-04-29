@@ -1,14 +1,14 @@
 // role.js
 
-"use strict";
-const { Model, DataTypes } = require("sequelize");
+'use strict';
+const { Model, DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   class Role extends Model {
     static associate(models) {
       Role.hasMany(models.User, {
-        foreignKey: "rol", //Clave foránea en la tabla de User
-        as: "users", //Alias para la relación
+        foreignKey: 'rol', //Clave foránea en la tabla de User
+        as: 'users', //Alias para la relación
       });
     }
   }
@@ -29,8 +29,8 @@ module.exports = (sequelize) => {
     },
     {
       sequelize,
-      modelName: "Role",
-      tableName: "roles",
+      modelName: 'Role',
+      tableName: 'roles',
       timestamps: false,
     }
   );

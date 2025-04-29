@@ -3,38 +3,45 @@
 <template>
   <div class="user-list-container container mt-4">
     <h2>Lista de Alumnos</h2>
-
-    <div class="row mb-3">
-      <div class="col-md-6">
-        <div class="input-group">
+    <div class="row mb-3 gx-2 align-items-end">
+      <div class="col-md-5">
+        <label for="nameSearchUserList" class="form-label form-label-sm visually-hidden">Buscar Nombre/Apellido:</label>
+        <div class="input-group input-group-sm">
           <input
             type="text"
+            id="nameSearchUserList"
             class="form-control"
-            v-model="searchQuery"
+            v-model.lazy="searchQuery"
             @keyup.enter="handleSearchNow"
+            placeholder="Nombre, Apellido, Email..."
+            aria-label="Buscar usuario"
             :disabled="isLoadingSearch"
-            placeholder="Buscar..."
           />
-          <button class="btn btn-primary" @click="handleSearchNow" :disabled="isLoadingSearch">
-            <span v-if="isLoadingSearch" class="spinner-border spinner-border-sm"></span>
-            <i v-else class="bi bi-search"></i> Buscar
-          </button>
           <button
-            v-if="isSearchResults"
+            v-if="searchQuery"
+            class="btn btn-outline-secondary"
+            type="button"
             @click="
               () => {
                 searchQuery = '';
                 handleSearchNow();
               }
             "
-            class="btn btn-outline-secondary"
-            type="button"
-            title="Mostrar todos"
+            title="Limpiar búsqueda"
           >
-            <i class="bi bi-x-lg"></i> Limpiar
+            <i class="bi bi-x-lg"></i>
+          </button>
+          <button
+            class="btn btn-outline-primary"
+            type="button"
+            @click="handleSearchNow"
+            :disabled="isLoadingSearch"
+            title="Buscar"
+          >
+            <i class="bi bi-search"></i>
           </button>
         </div>
-        <div v-if="searchError" class="alert alert-danger mt-2 p-2">{{ searchError }}</div>
+        <div v-if="searchError" class="text-danger small mt-1">{{ searchError }}</div>
       </div>
     </div>
 
@@ -50,7 +57,7 @@
         striped
         hover
         responsive="sm"
-        empty-text="No se encontraron alumnos."
+        empty-text="No se encontraron alumnos con los criterios actuales."
         show-empty
         class="mt-3 user-table"
         @row-clicked="toggleAssignments"
@@ -59,9 +66,9 @@
         details-toggle-event=""
       >
         <template #table-busy>
-          <div class="text-center text-info my-2">
-            <b-spinner class="align-middle"></b-spinner>
-            <strong> Cargando...</strong>
+          <div class="text-center text-secondary my-2">
+            <b-spinner class="align-middle small"></b-spinner>
+            <strong> Cargando Alumnos...</strong>
           </div>
         </template>
 
@@ -72,11 +79,11 @@
         </template>
 
         <template #cell(rol)="data">
-          {{ data.item.rolName || (data.item.rol === 1 ? 'Alumno' : data.item.rol === 2 ? 'Profesor' : data.item.rol) }}
+          {{ data.item.rolName || (data.item.rol === 1 ? 'Alumno' : data.item.rol) }}
         </template>
 
         <template #cell(actions)="data">
-          <div class="d-flex justify-content-end gap-1">
+          <div class="d-flex justify-content-center gap-1">
             <button
               v-if="data.item.rol === 1"
               class="btn btn-sm btn-outline-primary"
@@ -101,13 +108,27 @@
         </template>
 
         <template #row-details="row">
-          <div v-if="row.item._showDetails && selectedUser?.id === row.item.id">
+          <div v-if="row.item._showDetails">
             <div class="assignment-details p-3 bg-light border-top">
               <h5>Asignaturas de {{ row.item.name }} {{ row.item.surname }}:</h5>
-              <div v-if="isLoadingDetails" class="text-center text-muted py-2">
+
+              <div v-if="actionMessage && selectedUser?.id === row.item.id" class="mb-2">
+                <b-alert
+                  :modelValue="!!actionMessage"
+                  :variant="actionMessageVariant"
+                  show
+                  dismissible
+                  @dismissed="actionMessage = ''"
+                >
+                  {{ actionMessage }}
+                </b-alert>
+              </div>
+              <div v-if="isLoadingDetails && selectedUser?.id === row.item.id" class="text-center text-muted py-2">
                 <span class="spinner-border spinner-border-sm me-2" role="status"></span>Cargando...
               </div>
-              <div v-else-if="detailsError" class="alert alert-warning p-2">{{ detailsError }}</div>
+              <div v-else-if="detailsError && selectedUser?.id === row.item.id" class="alert alert-warning p-2">
+                {{ detailsError }}
+              </div>
               <div v-else>
                 <p v-if="!assignments || assignments.length === 0" class="fst-italic text-muted mb-0">
                   No tiene asignaturas asignadas.
@@ -120,16 +141,16 @@
                   >
                     <span>
                       <strong>{{ assign.subject?.subject || '?' }}</strong>
-                      <small class="text-muted ms-2">
-                        (Prof: {{ assign.teacher?.name || '?' }} {{ assign.teacher?.surname || '' }})
-                      </small>
+                      <small class="text-muted ms-2"
+                        >(Prof: {{ assign.teacher?.name || '?' }} {{ assign.teacher?.surname || '' }})</small
+                      >
                     </span>
                     <button
                       v-if="assign.id"
                       class="btn btn-xs btn-outline-danger border-0"
                       @click="removeAssignment(assign.id, row.item.id)"
                       :disabled="isDeletingRelationId === assign.id"
-                      title="Quitar esta asignación"
+                      title="Quitar Asignación"
                     >
                       <span v-if="isDeletingRelationId === assign.id" class="spinner-border spinner-border-sm"></span>
                       <i v-else class="bi bi-trash"></i>
@@ -154,7 +175,7 @@
 
 <script setup>
 // 1. Imports
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 import RelationService from '@/services/relations/RelationService';
 import UsersService from '@/services/users/UsersService';
 import AssignSubject from '@/components/users/AssignSubject.vue'; // Verifica ruta
@@ -177,6 +198,11 @@ onMounted(() => {
   fetchUsers('');
 });
 
+// Estado para Mensajes de Acción (Asignar/Quitar Asignación)
+const actionMessage = ref(''); // Mensaje (éxito o error) de la última acción
+const actionMessageVariant = ref('success'); // Variante ('success' o 'danger')
+let actionMessageTimeout = null; // Timer para auto-limpiar
+
 // Lógica de búsqueda (manual + debounce)
 let debounceTimer = null;
 const handleSearchNow = () => {
@@ -190,6 +216,16 @@ watch(searchQuery, (newValue) => {
       isSearchResults.value = !!newValue && newValue.trim() !== '';
       fetchUsers(newValue);
     }, 500);
+  }
+});
+watch(actionMessage, (newValue) => {
+  clearTimeout(actionMessageTimeout);
+  if (newValue) {
+    // Aplicar timeout a cualquier mensaje que aparezca
+    const timeoutDuration = actionMessageVariant.value === 'success' ? 3000 : 4000; // Más tiempo para errores
+    actionMessageTimeout = setTimeout(() => {
+      actionMessage.value = '';
+    }, timeoutDuration);
   }
 });
 
@@ -227,45 +263,37 @@ const {
 
 // Función toggleAssignments (simplificada)
 const toggleAssignments = async (userRowItem) => {
-  // Busca el item reactivo correspondiente en nuestro array 'users'
+  actionMessage.value = ''; // Limpiar mensaje de acción anterior al abrir/cerrar detalles
   const itemInState = users.value.find((u) => u.id === userRowItem.id);
-  if (!itemInState) {
-    return;
-  }
-
-  const isOpening = !itemInState._showDetails; // Determina si vamos a abrir o cerrar
-
-  // --- Lógica para cerrar otras filas (Opcional pero recomendado) ---
+  if (!itemInState) return;
+  const isOpening = !itemInState._showDetails;
   if (isOpening) {
     users.value.forEach((u) => {
-      if (u.id !== itemInState.id && u._showDetails) {
-        u._showDetails = false; // Cierra las demás
-      }
+      if (u.id !== itemInState.id) u._showDetails = false;
     });
   }
-
-  // Alterna el estado _showDetails del item actual (esto controla b-table)
   itemInState._showDetails = !itemInState._showDetails;
-
-  // Actualiza 'selectedUser' y carga datos
   if (itemInState._showDetails) {
     selectedUser.value = itemInState;
-    // Limpiar antes de cargar por si acaso
-    detailsError.value = null;
-    await fetchAssignmentsForStudent(itemInState.id); // Carga los datos usando el composable
+    detailsError.value = null; // Limpiar error de carga de detalles
+    await fetchAssignmentsForStudent(itemInState.id); // Carga datos
   } else {
-    // Si estamos CERRANDO, simplemente deseleccionamos
     selectedUser.value = null;
   }
 };
 
-// --- Lógica handleAssignSuccess (Ahora usa fetchAssignmentsForStudent) ---
+// Lógica handleAssignSuccess (Ahora usa fetchAssignmentsForStudent)
 const handleAssignSuccess = async () => {
   const currentlySelectedStudentId = selectedUser.value?.id;
   const assignedStudentId = studentToAssign.value?.id;
+  const studentName = studentToAssign.value?.name ?? '';
   closeAssignModal();
+  // Establecer mensaje de ÉXITO de la acción
+  actionMessage.value = `Asignatura asignada ${studentName ? 'a ' + studentName : ''} con éxito.`;
+  actionMessageVariant.value = 'success';
+  // Refrescar detalles si estaban abiertos
   if (currentlySelectedStudentId && currentlySelectedStudentId === assignedStudentId) {
-    await fetchAssignmentsForStudent(currentlySelectedStudentId); // <-- Llama al execute del composable
+    await fetchAssignmentsForStudent(currentlySelectedStudentId);
   }
 };
 
@@ -285,14 +313,13 @@ const fieldsProfesor = [
   },
 ];
 
-// 7. Lógica para Eliminar Asignación (desde los detalles)
+// 7. Lógica para Eliminar Asignación
 const isDeletingRelationId = ref(null); // Para el spinner del botón borrar asignación
 
 async function removeAssignment(relationId, studentId) {
-  // Esta función ya estaba bien, solo necesita llamar a fetchAssignmentsForStudent al final
   const student = users.value.find((u) => u.id === studentId);
   const studentName = student ? `${student.name} ${student.surname}` : `ID ${studentId}`;
-  const assignment = assignments.value.find((a) => a.id === relationId); // Usa assign.id de la relación
+  const assignment = assignments.value.find((a) => a.id === relationId);
   const subjectName = assignment?.subject?.subject || 'esta asignatura';
 
   if (!window.confirm(`¿Seguro que quieres quitar ${subjectName} al alumno ${studentName}?`)) {
@@ -300,27 +327,30 @@ async function removeAssignment(relationId, studentId) {
   }
 
   isDeletingRelationId.value = relationId;
-  detailsError.value = '';
+  actionMessage.value = ''; // Limpiar acción previa
+  detailsError.value = ''; // Limpiar error carga previo
 
   try {
     const response = await RelationService.deleteRelation(relationId);
     if (response && response.success) {
-      alert(`Asignación de ${subjectName} eliminada.`);
-      // Refrescar detalles si el usuario afectado sigue seleccionado
+      // Mensaje ÉXITO de la acción
+      actionMessage.value = response.message || `Asignación de ${subjectName} eliminada.`;
+      actionMessageVariant.value = 'success';
       if (selectedUser.value && selectedUser.value.id === studentId) {
-        await fetchAssignmentsForStudent(studentId); // <-- Llama al execute del composable
+        await fetchAssignmentsForStudent(studentId); // Refrescar
       }
     } else {
-      detailsError.value = response?.message || 'Error del backend al eliminar.';
-      alert(`Error al eliminar: ${detailsError.value}`);
+      // Mensaje ERROR de la acción
+      actionMessage.value = response?.message || 'Error backend al eliminar.';
+      actionMessageVariant.value = 'danger';
     }
   } catch (error) {
-    console.error(`Error al eliminar relación ${relationId}:`, error);
-    const message = error.response?.data?.message || error.message || 'Error desconocido.';
-    detailsError.value = message;
-    alert(`Error: ${message}`);
+    // Mensaje ERROR de la acción
+    const message = error.response?.data?.message || error.message || 'Error.';
+    actionMessage.value = `Error: ${message}`;
+    actionMessageVariant.value = 'danger';
   } finally {
-    isDeletingRelationId.value = null; // Limpiar estado de carga
+    isDeletingRelationId.value = null;
   }
 }
 </script>

@@ -19,25 +19,26 @@
         <td>{{ subject.id }}</td>
         <td>{{ subject.subject }}</td>
         <td>
-          <button
-            class="btn btn-sm btn-warning me-2"
-            @click="
-              () => {
-                console.log('Intentando emitir edit:', subject);
-                $emit('edit', subject);
-              }
-            "
-            :disabled="actionsDisabled"
-          >
-            <i class="bi bi-pencil"></i> Editar
-          </button>
-          <button
-            class="btn btn-sm btn-danger"
-            @click="$emit('delete', subject.id)"
-            :disabled="actionsDisabled"
-          >
-            <i class="bi bi-trash"></i> Eliminar
-          </button>
+          <div class="d-flex gap-1 justify-content-start">
+            <button
+              class="btn btn-sm btn-warning"
+              @click="$emit('edit', subject)"
+              :disabled="actionsDisabled"
+              title="Editar Asignatura"
+            >
+              <i class="bi bi-pencil"></i>
+              <span class="d-none d-md-inline ms-1">Editar</span>
+            </button>
+            <button
+              class="btn btn-sm btn-danger"
+              @click="$emit('delete', subject.id)"
+              :disabled="actionsDisabled"
+              title="Eliminar Asignatura"
+            >
+              <i class="bi bi-trash"></i>
+              <span class="d-none d-md-inline ms-1">Eliminar</span>
+            </button>
+          </div>
         </td>
       </tr>
     </tbody>
@@ -46,7 +47,7 @@
 
 <script>
 export default {
-  name: "SubjectTable",
+  name: 'SubjectTable',
   props: {
     // Prop para recibir el array de asignaturas desde el padre
     subjects: {
@@ -62,11 +63,11 @@ export default {
     // Prop para personalizar el mensaje cuando la tabla está vacía
     emptyMessage: {
       type: String,
-      default: "No hay asignaturas para mostrar.",
+      default: 'No hay asignaturas para mostrar.',
     },
   },
   // Declara los eventos que este componente puede emitir hacia el padre
-  emits: ["edit", "delete"],
+  emits: ['edit', 'delete'],
 };
 </script>
 

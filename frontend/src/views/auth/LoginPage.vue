@@ -75,23 +75,20 @@ export default {
             try {
               const decodedToken = jwtDecode(token);
               const userRole = decodedToken.rol;
-              this.$router.push('/dashboard');
+              this.$router.push('/home');
             } catch (decodeError) {
               console.error('Error al decodificar token justo después del login:', decodeError);
               this.errorMessage = 'Error al procesar la sesión. Intenta de nuevo.';
               AuthService.logout(); // Forzar logout si el token recién guardado es inválido
             }
           } else {
-            console.error(
-              'Login reportado como exitoso pero no se encontró token en localStorage.'
-            );
+            console.error('Login reportado como exitoso pero no se encontró token en localStorage.');
             this.errorMessage = 'Error de inicio de sesión inesperado (token no guardado).';
           }
         } else {
           // El servicio AuthService.login devolvió success: false
           console.log('Fallo de inicio de sesión reportado por el servicio:', loginResult.message);
-          this.errorMessage =
-            loginResult.message || 'Credenciales incorrectas o error desconocido.';
+          this.errorMessage = loginResult.message || 'Credenciales incorrectas o error desconocido.';
         }
       } catch (error) {
         // Error de red o error lanzado por AuthService.login

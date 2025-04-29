@@ -33,12 +33,9 @@
             class="form-control form-control-sm"
             :disabled="isUploading"
           />
-          <div v-if="uploadErrorMessage" class="text-danger small mt-1">{{ uploadErrorMessage }}</div>
-          <button
-            class="btn btn-secondary btn-sm mt-2"
-            @click="updateProfilePic"
-            :disabled="isUploading || !selectedFile"
-          >
+          <div v-if="uploadError" class="text-danger small mt-1">{{ uploadError }}</div>
+          <div v-if="uploadSuccess" class="text-success small mt-1">{{ uploadSuccess }}</div>
+          <button class="btn btn-secondary btn-sm mt-2" @click="updateProfilePic" :disabled="isUploading || !canUpload">
             <span v-if="isUploading" class="spinner-border spinner-border-sm me-1"></span>
             {{ isUploading ? 'Subiendo...' : 'Subir Imagen' }}
           </button>
@@ -101,6 +98,20 @@
               :disabled="isSavingProfile"
             />
           </div>
+          <div class="mb-3">
+            <label for="profileRol" class="form-label">Rol:</label
+            ><select
+              id="profileRol"
+              class="form-select"
+              v-model="editFormData.rol"
+              required
+              :disabled="isSavingProfile"
+            >
+              <option :value="null" disabled>-- Selecciona un rol --</option>
+              <option :value="1">Alumno</option>
+              <option :value="2">Profesor</option>
+            </select>
+          </div>
           <div class="text-end">
             <button
               type="button"
@@ -145,12 +156,12 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import apiClient from '@/services/apiClient';
 import AuthService from '@/services/auth/AuthService';
 import RelationService from '@/services/relations/RelationService';
 import UsersService from '@/services/users/UsersService';
 import { useFetchData } from '@/composables/useFetchData';
 import validator from 'validator';
+import { useProfilePicUpload } from '@/composables/useProfilePicUpload';
 
 // --- 1. Carga de Datos del Usuario  ---
 const {
@@ -164,102 +175,60 @@ onMounted(fetchUserData);
 // --- 2. Propiedades Computadas ---
 const isProfesor = computed(() => userData.value?.rol === 2);
 const roleName = computed(() => {
-  if (!userData.value) return 'Cargando...';
-  return (
-    userData.value.role_name || (isProfesor.value ? 'Profesor' : userData.value.rol === 1 ? 'Alumno' : 'Desconocido')
-  );
+  if (isLoadingUser.value) return 'Cargando...';
+  if (!userData.value?.rol) return 'Desconocido'; // Usa el ID numérico
+  if (userData.value.rol === 1) return 'Alumno';
+  if (userData.value.rol === 2) return 'Profesor';
+  return 'Desconocido';
 });
 
-// --- 3. Lógica de Imagen de Perfil (usando refs) ---
-const profileImageUrl = ref(''); // URL de la imagen a mostrar
-const selectedFile = ref(null); // Archivo seleccionado en el input
-const isUploading = ref(false); // Estado de carga para la subida
-const uploadErrorMessage = ref(''); // Mensaje de error para la subida
-const fileInputRef = ref(null); // Referencia de plantilla para el <input type="file">
-const backendBaseUrl = computed(() => {
-  return apiClient.defaults.baseURL?.replace('/api', '') || 'http://localhost:3000';
-});
+// --- 3. Lógica de Imagen de Perfil (usando el composable) ---
+const currentUserId = computed(() => userData.value?.id); // ID del usuario actual
+const currentImageFilename = computed(() => userData.value?.profile_image); // Nombre archivo actual
+const {
+  profileImageUrl, // ref readonly: URL de la imagen a mostrar
+  isUploading, // ref readonly: true si está subiendo
+  uploadError, // ref readonly: mensaje de error de subida/validación
+  uploadSuccess, // ref readonly: mensaje de éxito
+  canUpload, // computed readonly: true si hay archivo seleccionado
+  onFileChange, // método para el @change del input
+  updateProfilePic, // método para el @click del botón subir
+} = useProfilePicUpload(currentUserId, currentImageFilename);
+const fileInputRef = ref(null);
+
 const isEditingProfile = ref(false);
 const isSavingProfile = ref(false);
 const saveProfileError = ref('');
 const saveProfileSuccessMessage = ref('');
 const editFormData = ref({ name: '', surname: '', email: '' });
-// Observador para actualizar la imagen cuando userData cambie (o cargue)
 
-// Manejador para cuando se selecciona un archivo
-const onFileChange = (event) => {
-  const file = event.target.files?.[0];
-  uploadErrorMessage.value = '';
-  selectedFile.value = null;
-  if (fileInputRef.value) {
-    fileInputRef.value.value = '';
-  }
-  if (file && validateFile(file)) {
-    selectedFile.value = file;
-    profileImageUrl.value = URL.createObjectURL(file);
-  } else if (file) {
-    if (fileInputRef.value) {
-      fileInputRef.value.value = '';
+watch(
+  userData,
+  (newUserData, oldUserData) => {
+    // Actualiza imagen (sin cambios)
+    if (isEditingProfile.value && newUserData) {
+      console.log('Watcher userData: Inicializando form edición.');
+      initializeEditForm(newUserData);
     }
-  }
-};
 
-// Validación del archivo (devuelve true/false, pone mensaje de error)
-const validateFile = (file) => {
-  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-  const maxSize = 10 * 1024 * 1024; // 10MB
-  if (!validTypes.includes(file.type)) {
-    uploadErrorMessage.value = 'Formato no válido (solo jpeg, jpg, png, gif).';
-    return false;
-  }
-  if (file.size > maxSize) {
-    uploadErrorMessage.value = 'Archivo demasiado grande (Máx 10MB).';
-    return false;
-  }
-  return true;
-};
+    if (
+      newUserData?.rol === 2 &&
+      newUserData?.id &&
+      (newUserData.id !== oldUserData?.id || newUserData.rol !== oldUserData?.rol)
+    ) {
+      fetchTeacherSubjectsSummary();
+    } else if (newUserData?.rol !== 2) {
+      // Si no es profesor (o deja de serlo), limpiar el resumen
+      teacherSubjectsSummary.value = [];
+      summaryError.value = '';
+    }
+  },
+  { deep: true }
+);
 
-// Sube la imagen seleccionada al backend
-const updateProfilePic = async () => {
-  // Verifica que haya un archivo seleccionado y tengamos el ID del usuario
-  if (!selectedFile.value || !userData.value?.id) {
-    uploadErrorMessage.value = '...';
-    return;
-  }
-  isUploading.value = true;
-  uploadErrorMessage.value = '';
-  const formData = new FormData();
-  formData.append('image', selectedFile.value);
-  try {
-    const response = await AuthService.uploadProfilePicture(userData.value.id, formData);
-    if (response.success) {
-      alert('Imagen actualizada.');
-      // Actualizar UI
-      if (response.imageUrl) {
-        profileImageUrl.value = response.imageUrl;
-      } else if (response.filename) {
-        profileImageUrl.value = `<span class="math-inline">\{backendBaseUrl\.value\}/uploads/profile\_images/</span>{response.filename}`;
-      }
-      if (userData.value && response.filename) {
-        userData.value.profile_image = response.filename;
-      } // Actualiza estado local
-      selectedFile.value = null;
-      if (fileInputRef.value) {
-        fileInputRef.value.value = '';
-      }
-    } else {
-      uploadErrorMessage.value = response.message || 'Error al subir.';
-    }
-  } catch (error) {
-    console.error('Error pic:', error);
-    uploadErrorMessage.value = error.response?.data?.message || error.message || 'Error de red.';
-  } finally {
-    isUploading.value = false;
-    /* Revertir preview si falló */ if (uploadErrorMessage.value) {
-      fetchUserData();
-    }
-  } // Recargar datos si falla
-};
+onMounted(() => {
+  fetchUserData(); // Carga inicial de datos de usuario
+});
 
 // Copia los datos actuales al formulario de edición
 function initializeEditForm(currentUserData) {
@@ -267,13 +236,14 @@ function initializeEditForm(currentUserData) {
     editFormData.value.name = currentUserData.name || '';
     editFormData.value.surname = currentUserData.surname || '';
     editFormData.value.email = currentUserData.email || '';
+    editFormData.value.rol = currentUserData.rol || null;
   }
 }
 
 // Activa el modo edición
 function startEditingProfile() {
-  saveProfileError.value = ''; // Limpiar errores/éxitos previos
-  saveProfileSuccessMessage.value = '';
+  saveProfileError.value = ''; // Limpiar errores previos
+  saveProfileSuccessMessage.value = ''; // Limpia al empezar a editar
   initializeEditForm(userData.value); // Carga datos actuales en el form
   isEditingProfile.value = true;
 }
@@ -281,8 +251,8 @@ function startEditingProfile() {
 // Cancela el modo edición
 function cancelEditingProfile() {
   isEditingProfile.value = false;
-  saveProfileError.value = ''; // Limpiar errores
-  saveProfileSuccessMessage.value = '';
+  saveProfileError.value = ''; // Limpiar errores previos
+  saveProfileSuccessMessage.value = ''; // Limpia al cancelar
 }
 
 // Guarda los cambios del perfil
@@ -312,7 +282,7 @@ async function saveProfileChanges() {
       name: editFormData.value.name,
       surname: editFormData.value.surname,
       email: editFormData.value.email,
-      // NO enviamos rol ni active desde aquí
+      rol: editFormData.value.rol,
     };
     // Llamamos al servicio de Users (asegúrate que está importado)
     const response = await UsersService.updateUser(userData.value.id, payload);
@@ -367,35 +337,6 @@ async function fetchTeacherSubjectsSummary() {
     isLoadingSummary.value = false;
   }
 }
-
-watch(
-  userData,
-  (newUserData, oldUserData) => {
-    // Actualiza imagen (sin cambios)
-    if (!isUploading.value && newUserData?.profile_image) {
-      profileImageUrl.value = `${backendBaseUrl.value}/uploads/profile_images/${newUserData.profile_image}`;
-    } else if (!isUploading.value && !newUserData?.profile_image) {
-      profileImageUrl.value = '';
-    }
-    // Inicializa form edición (sin cambios)
-    if (isEditingProfile.value && newUserData) {
-      initializeEditForm(newUserData);
-    }
-
-    // --- Cargar resumen si es profesor ---
-    if (newUserData?.rol === 2 && newUserData?.id) {
-      // Llama solo si el rol o ID cambiaron o es la carga inicial relevante
-      if (newUserData.id !== oldUserData?.id || newUserData.rol !== oldUserData?.rol) {
-        fetchTeacherSubjectsSummary();
-      }
-    } else {
-      // Limpiar si no es profesor o no hay datos
-      teacherSubjectsSummary.value = [];
-      summaryError.value = '';
-    }
-  },
-  { immediate: true, deep: true }
-); // Immediate para intentar cargar al inicio
 </script>
 
 <style scoped>

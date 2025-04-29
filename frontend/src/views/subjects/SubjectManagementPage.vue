@@ -15,7 +15,11 @@
         <i class="bi bi-plus-circle"></i> Añadir Nueva Asignatura
       </button>
     </div>
-
+    <div v-if="actionMessage" class="mb-3">
+      <b-alert :modelValue="!!actionMessage" :variant="actionMessageVariant" show>
+        {{ actionMessage }}
+      </b-alert>
+    </div>
     <SubjectForm
       v-if="formMode !== null"
       :key="subjectForForm ? subjectForForm.id : 'add'"
@@ -42,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch, onUnmounted } from 'vue';
 import SubjectService from '@/services/subjects/SubjectService';
 import SubjectTable from '@/components/subjects/SubjectTable.vue';
 import SubjectForm from '@/components/subjects/SubjectForm.vue';
@@ -60,7 +64,6 @@ const {
 );
 
 onMounted(() => {
-  console.log('SubjectManagementPage (setup): Montado. Llamando a loadSubjects...');
   loadSubjects();
 });
 
@@ -70,10 +73,39 @@ const subjectForForm = ref(null);
 const isSaving = ref(false);
 const formApiErrorMessage = ref('');
 const isDeleting = ref(false);
+const actionMessage = ref(''); // Mensaje general (éxito o error de borrado)
+const actionMessageVariant = ref('success'); // 'success' o 'danger'
 
-// Métodos
+// Watcher para limpiar mensaje de éxito o error
+let actionMessageTimeout = null; // Timer para auto-limpiar éxito
+
+// Watcher para limpiar mensajes de éxito
+watch(
+  actionMessage,
+  (newValue) => {
+    clearTimeout(actionMessageTimeout);
+    if (newValue) {
+      // <-- Se ejecuta si hay cualquier texto (éxito o error)
+      // Opcional: Dar más tiempo para leer los errores
+      const timeoutDuration = actionMessageVariant.value === 'success' ? 4000 : 5000;
+
+      actionMessageTimeout = setTimeout(() => {
+        console.log(`Watcher: Timeout! Limpiando mensaje.`);
+        actionMessage.value = ''; // Limpiar el mensaje después del timeout
+      }, timeoutDuration);
+    } else {
+      console.log(`Watcher: Mensaje vacío.`);
+    }
+  },
+  { deep: false }
+);
+onUnmounted(() => {
+  clearTimeout(actionMessageTimeout);
+}); // Limpieza al desmontar
+
 // Cargar asignaturas al montar el componente
 const openAddForm = () => {
+  actionMessage.value = '';
   formMode.value = 'add';
   subjectForForm.value = null;
   formApiErrorMessage.value = '';
@@ -81,7 +113,7 @@ const openAddForm = () => {
 
 // Abrir el formulario de edición
 const openEditForm = (subjectToEdit) => {
-  console.log('Edit event received:', subjectToEdit);
+  actionMessage.value = '';
   formMode.value = 'edit';
   subjectForForm.value = { ...subjectToEdit };
   formApiErrorMessage.value = '';
@@ -89,7 +121,7 @@ const openEditForm = (subjectToEdit) => {
 
 // Cancelar el formulario
 const handleFormCancel = () => {
-  console.log('Form cancel received');
+  actionMessage.value = '';
   formMode.value = null;
   subjectForForm.value = null;
   formApiErrorMessage.value = '';
@@ -97,29 +129,31 @@ const handleFormCancel = () => {
 
 // Guardar el formulario
 const handleFormSave = async (formData) => {
-  console.log('Parent received form save:', formData);
-  isSaving.value = true; // Accedemos con .value
+  isSaving.value = true;
   formApiErrorMessage.value = '';
-  const isEdit = formData.id !== null;
+  actionMessage.value = '';
 
+  const isEdit = formData.id !== null;
   try {
     const subjectDataPayload = { subject: formData.subject };
     if (isEdit) {
-      // Lógica para el update
+      // Lógica para Actualizar
       const response = await SubjectService.updateSubject(formData.id, subjectDataPayload);
       if (response.success) {
-        alert(`Asignatura ID ${formData.id} actualizada.`);
         handleFormCancel();
         await loadSubjects(); // <-- Llama a la función del composable para recargar
+        actionMessage.value = `La asignatura ${formData.subject} actualizada con éxito.`;
+        actionMessageVariant.value = 'success';
       } else {
         formApiErrorMessage.value = response.message || 'No se pudo actualizar.';
       }
     } else {
-      // Lógica para el create
+      // Lógica para Crear
       const createdSubject = await SubjectService.createSubject(subjectDataPayload);
-      alert(`Asignatura "${createdSubject.subject}" creada.`);
       handleFormCancel();
       await loadSubjects(); // <-- Llama a la función del composable para recargar
+      actionMessage.value = `Asignatura "${createdSubject.subject}" creada con éxito.`;
+      actionMessageVariant.value = 'success';
     }
   } catch (error) {
     console.error(`Error al ${isEdit ? 'actualizar' : 'crear'} asignatura:`, error);
@@ -131,26 +165,27 @@ const handleFormSave = async (formData) => {
 
 // Eliminar asignatura
 const deleteSubject = async (subjectId) => {
-  console.log('Delete event received:', subjectId);
   if (!subjectId || !(await window.confirm(`¿Seguro que quieres eliminar ID ${subjectId}?`))) {
     return;
   }
   isDeleting.value = true;
   listError.value = '';
+  actionMessage.value = '';
 
   try {
     const response = await SubjectService.deleteSubject(subjectId);
     if (response.success) {
-      alert(`Asignatura ID ${subjectId} eliminada.`);
+      actionMessage.value = response.message || `Asignatura ID ${subjectId} eliminada con éxito.`;
+      actionMessageVariant.value = 'success';
       await loadSubjects(); // <-- Llama a la función del composable para recargar
     } else {
-      alert(`Error al eliminar: ${response.message || '?'}`);
-      listError.value = response.message; // Guardamos error en la ref del composable
+      actionMessage.value = `Error al eliminar: ${response.message || 'Error desconocido del backend.'}`;
+      actionMessageVariant.value = 'danger';
     }
   } catch (error) {
     const message = error.response?.data?.message || error.message || '?';
-    alert(`Error al eliminar: ${message}`);
-    listError.value = message; // Guardamos error en la ref del composable
+    actionMessage.value = `Error al eliminar: ${message}`;
+    actionMessageVariant.value = 'danger';
   } finally {
     isDeleting.value = false;
   }

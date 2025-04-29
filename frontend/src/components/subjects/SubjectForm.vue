@@ -6,18 +6,12 @@
       <h5 class="card-title">{{ formTitle }}</h5>
 
       <form @submit.prevent="handleSubmit">
-        <div
-          v-if="errorMessage || internalErrorMessage"
-          class="alert alert-danger mt-2 p-2"
-          role="alert"
-        >
+        <div v-if="errorMessage || internalErrorMessage" class="alert alert-danger mt-2 p-2" role="alert">
           {{ errorMessage || internalErrorMessage }}
         </div>
 
         <div class="mb-3">
-          <label for="subjectNameInput" class="form-label"
-            >Nombre de la Asignatura:</label
-          >
+          <label for="subjectNameInput" class="form-label">Nombre de la Asignatura:</label>
           <input
             type="text"
             class="form-control"
@@ -30,12 +24,7 @@
         </div>
 
         <div class="text-end">
-          <button
-            type="button"
-            class="btn btn-secondary me-2"
-            @click="handleCancel"
-            :disabled="isLoading"
-          >
+          <button type="button" class="btn btn-secondary me-2" @click="handleCancel" :disabled="isLoading">
             Cancelar
           </button>
           <button
@@ -44,12 +33,7 @@
             :class="isEditMode ? 'btn-success' : 'btn-primary'"
             :disabled="isLoading || !formData.subject"
           >
-            <span
-              v-if="isLoading"
-              class="spinner-border spinner-border-sm"
-              role="status"
-              aria-hidden="true"
-            ></span>
+            <span v-if="isLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
             {{ buttonText }}
           </button>
         </div>
@@ -60,7 +44,7 @@
 
 <script>
 export default {
-  name: "SubjectForm",
+  name: 'SubjectForm',
   props: {
     // Objeto con datos iniciales para modo edición. Si es null, es modo añadir.
     initialSubject: {
@@ -75,20 +59,20 @@ export default {
     // Mensaje de error específico de API pasado desde el padre (ej: nombre duplicado)
     errorMessage: {
       type: String,
-      default: "",
+      default: '',
     },
   },
   // Eventos que este componente emite hacia el padre
-  emits: ["save", "cancel"],
+  emits: ['save', 'cancel'],
   data() {
     return {
       // Estado interno del formulario
       formData: {
         id: null,
-        subject: "", // Usaremos 'subject' para mantener consistencia con tu modelo
+        subject: '', // Usaremos 'subject' para mantener consistencia con tu modelo
       },
       // Para errores de validación DENTRO del formulario (ej: campo vacío)
-      internalErrorMessage: "",
+      internalErrorMessage: '',
     };
   },
   computed: {
@@ -98,25 +82,19 @@ export default {
     },
     // Título dinámico para el formulario
     formTitle() {
-      return this.isEditMode
-        ? `Editando Asignatura (ID: ${this.initialSubject.id})`
-        : "Nueva Asignatura";
+      return this.isEditMode ? `Editando Asignatura (ID: ${this.initialSubject.id})` : 'Nueva Asignatura';
     },
     // Texto dinámico para el botón de guardar/actualizar
     buttonText() {
       if (this.isLoading) {
-        return this.isEditMode ? "Actualizando..." : "Guardando...";
+        return this.isEditMode ? 'Actualizando...' : 'Guardando...';
       }
-      return this.isEditMode ? "Actualizar" : "Guardar";
+      return this.isEditMode ? 'Actualizar' : 'Guardar';
     },
   },
   methods: {
     // Inicializa o resetea los datos del formulario basado en la prop initialSubject
     initializeForm() {
-      console.log(
-        "SubjectForm: Initializing/Resetting form. Edit Mode:",
-        this.isEditMode
-      );
       if (this.isEditMode) {
         // Modo Edición: Copia los datos del objeto pasado como prop
         this.formData.id = this.initialSubject.id;
@@ -124,30 +102,29 @@ export default {
       } else {
         // Modo Añadir: Resetea los campos
         this.formData.id = null;
-        this.formData.subject = "";
+        this.formData.subject = '';
       }
-      this.internalErrorMessage = ""; // Limpiar errores internos
+      this.internalErrorMessage = ''; // Limpiar errores internos
     },
     // Se ejecuta al enviar el formulario
     handleSubmit() {
-      this.internalErrorMessage = ""; // Limpiar errores previos
+      this.internalErrorMessage = ''; // Limpiar errores previos
       // Validación básica interna
       if (!this.formData.subject) {
-        this.internalErrorMessage =
-          "El nombre de la asignatura no puede estar vacío.";
+        this.internalErrorMessage = 'El nombre de la asignatura no puede estar vacío.';
         return; // Detener si falla validación interna
       }
       // Si la validación pasa, emite el evento 'save' con los datos actuales del formulario
-      console.log("SubjectForm: Emitting save event with data:", {
+      console.log('SubjectForm: Emitting save event with data:', {
         ...this.formData,
       });
       // Emitimos una copia para evitar mutaciones inesperadas
-      this.$emit("save", { ...this.formData });
+      this.$emit('save', { ...this.formData });
     },
     // Se ejecuta al pulsar Cancelar
     handleCancel() {
-      console.log("SubjectForm: Emitting cancel event");
-      this.$emit("cancel");
+      console.log('SubjectForm: Emitting cancel event');
+      this.$emit('cancel');
     },
     // Pone el foco en el input (útil al abrir el form)
     focusInput() {

@@ -1,23 +1,23 @@
 // backend/models/subject.js
 
-"use strict";
-const { Model, DataTypes } = require("sequelize");
+'use strict';
+const { Model, DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   class Subject extends Model {
     static associate(models) {
       // Relacionamos con la tabla 'students_teachers_relation'
       Subject.hasMany(models.Students_teachers_relation, {
-        foreignKey: "id_subject",
-        as: "teacherStudentRelation",
+        foreignKey: 'id_subject',
+        as: 'teacherStudentRelation',
       });
 
       // Relacionamos con la tabla 'teachers_subjects'
       Subject.belongsToMany(models.User, {
         through: models.TeacherSubject,
-        foreignKey: "id_subject",
-        otherKey: "id_teacher",
-        as: "teachers",
+        foreignKey: 'id_subject',
+        otherKey: 'id_teacher',
+        as: 'teachers',
       });
     }
   }
@@ -38,8 +38,8 @@ module.exports = (sequelize) => {
     },
     {
       sequelize,
-      modelName: "Subject",
-      tableName: "subjects",
+      modelName: 'Subject',
+      tableName: 'subjects',
       timestamps: false,
     }
   );

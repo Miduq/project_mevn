@@ -11,6 +11,8 @@ import ProfilePage from '@/views/users/ProfilePage.vue';
 import UserListPage from '@/views/users/UserListPage.vue';
 import SubjectManagementPage from '@/views/subjects/SubjectManagementPage.vue';
 import NotFoundPage from '../views/NotFoundPage.vue';
+import ErrorPage from '../views/ErrorPage.vue';
+import ChatPage from '@/views/chat/ChatPage.vue';
 import { jwtDecode } from 'jwt-decode';
 
 const routes = [
@@ -32,6 +34,20 @@ const routes = [
     path: '/reset-password',
     name: 'ResetPassPage',
     component: ResetPasswordPage,
+    beforeEnter: (to, from, next) => {
+      const resetToken = to.query.token;
+
+      if (resetToken && resetToken.trim() !== '') {
+        // Si existe un token y no está vacío, permite el acceso
+        console.log('Guardia /reset-password: Token encontrado en query. Permitiendo acceso.');
+        next();
+      } else {
+        // Si NO hay token en la query, no permitas entrar y redirige
+        console.warn('Guardia /reset-password: Token NO encontrado o vacío en query. Redirigiendo a RecoverPassPage.');
+        // Redirigimos a la página donde se solicita la recuperación
+        next({ name: 'RecoverPassPage' });
+      }
+    },
   },
   {
     path: '/register',
@@ -72,6 +88,17 @@ const routes = [
     meta: { requiresAuth: true, requiredRole: 2 },
   },
   {
+    path: '/chat',
+    name: 'ChatPage',
+    component: ChatPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/error',
+    name: 'ErrorPage',
+    component: ErrorPage,
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: NotFoundPage,
@@ -109,7 +136,7 @@ router.beforeEach((to, from, next) => {
           next();
         } else {
           console.warn(`Guard: Rol incorrecto (${userRole} !== ${requiredRole}`);
-          next({ name: 'DashboardPage' });
+          next({ name: 'HomePage' });
         }
       } catch (error) {
         console.error('Guard: Error decodificando token:', error);

@@ -196,20 +196,30 @@ exports.recoverPassword = async (req, res) => {
 };
 
 // Obtener datos del usuario actual
-exports.getCurrentUser = async (req, res) => {
+exports.getCurrentUser = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: ['id', 'name', 'surname', 'email', 'rol', 'profile_image'],
-      include: [{ model: Role, as: 'userRole' }],
+      attributes: ['id', 'username', 'name', 'surname', 'email', 'rol', 'profile_image', 'active'],
+      include: [{ model: Role, as: 'userRole', attributes: ['id', 'role_name'] }],
     });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
     }
 
-    res.json({ success: true, user });
+    const userResponse = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      surname: user.surname,
+      email: user.email,
+      rol: user.rol,
+      role_name: user.userRole?.role_name || (user.rol === 1 ? 'Alumno' : user.rol === 2 ? 'Profesor' : 'Desconocido'),
+      profile_image: user.profile_image,
+      active: user.active,
+    };
+    res.json({ success: true, user: userResponse });
   } catch (error) {
-    console.error('Error al obtener el usuario actual:', error);
-    res.status(500).json({ success: false, message: 'Error del servidor.' });
+    next(error);
   }
 };

@@ -11,7 +11,7 @@
 
       <li v-if="isLoggedIn"><router-link to="/profile">Perfil</router-link></li>
       <li v-if="isLoggedIn">
-        <router-link to="/dashboard">Dashboard</router-link>
+        <router-link to="/home">Home</router-link>
       </li>
 
       <li v-if="isLoggedIn && userRole === 2">
@@ -19,6 +19,9 @@
       </li>
       <li v-if="isLoggedIn && userRole === 2">
         <router-link to="/subjects">Gestionar Asignaturas</router-link>
+      </li>
+      <li v-if="isLoggedIn">
+        <router-link to="/chat">Chat</router-link>
       </li>
       <li v-if="isLoggedIn">
         <a href="#" @click.prevent="logoutAndRedirect()">Cerrar Sesión</a>
