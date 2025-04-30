@@ -3,10 +3,7 @@
 <template>
   <div class="chat-page container mt-4">
     <h2 class="mb-3">Chat</h2>
-
-    <div class="connection-status card bg-light p-2 mb-3 shadow-sm">...</div>
     <hr />
-
     <div class="chat-interface row">
       <div class="col-md-4 mb-3 mb-md-0">
         <h5>Contactos</h5>
@@ -20,12 +17,17 @@
             v-for="contact in contacts"
             :key="contact.id"
             href="#"
-            class="list-group-item list-group-item-action"
+            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
             :class="{ active: selectedContact?.id === contact.id }"
             @click.prevent="selectContact(contact)"
           >
-            {{ contact.name }} {{ contact.surname }}
-            <small class="text-muted d-block">{{ contact.type }}</small>
+            <span>
+              {{ contact.name }} {{ contact.surname }}
+              <small class="text-muted d-block">{{ contact.type }}</small>
+            </span>
+            <span v-if="unreadSenders.has(contact.id)" class="badge bg-danger rounded-pill p-1" title="Nuevos mensajes">
+              <span class="visually-hidden">Nuevos mensajes</span>
+            </span>
           </a>
         </div>
       </div>
@@ -36,6 +38,10 @@
           <span v-else class="text-muted">Nadie seleccionado</span>
         </h5>
         <div ref="chatWindowRef" class="messages-area card card-body mb-3 shadow-sm">
+          <div v-if="isLoadingDetails" class="text-center text-muted p-5">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            Cargando historial...
+          </div>
           <p v-if="!selectedContact" class="text-center text-muted fst-italic mt-3">
             Selecciona un contacto de la lista para empezar a chatear.
           </p>
@@ -83,6 +89,9 @@
             <i class="bi bi-send"></i> Enviar
           </button>
         </div>
+        <div v-if="chatError" class="alert alert-warning p-2 mt-2 small" role="alert">
+          {{ chatError }}
+        </div>
       </div>
     </div>
   </div>
@@ -90,36 +99,33 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { useSocket } from '@/composables/useSocket';
+import { useSocket } from '@/composables/useSocket.js';
 import RelationService from '@/services/relations/RelationService';
 import { jwtDecode } from 'jwt-decode';
 
 // 1. Obtenemos el estado y las funciones del composable
 const {
-  isConnected, // boolean reactivo: ¿estamos conectados?
-  connectionError, // string|null reactivo: último error de conexión
-  connect, // función para iniciar la conexión (con token)
-  disconnect, // función para desconectar manualmente
-  userId, // ref(null) -> ID del usuario autenticado (si/cuando se recibe)
-  username, // ref(null) -> Username del usuario (si/cuando se recibe)
-  registerListener, // función para escuchar eventos (ej. 'newMessage')
-  unregisterListener, // función para dejar de escuchar
-  emitEvent, // función para enviar eventos (ej. 'sendMessage')
-} = useSocket();
+  isConnected,
+  userId,
+  emitEvent, // <-- Obtenemos la función para emitir eventos
+  registerListener, // <-- Obtenemos la función para limpiar
+  unregisterListener, // <-- Obtenemos la función para limpiar
+  unreadSenders, // <-- Obtenemos el Set global
+  setActiveChatPartner, // <-- Obtenemos la función para limpiar
+} = useSocket(); // connect/disconnect no se llaman aquí directamente si App.vue lo maneja
 
-// --- 2. Estado del Chat ---
-const messages = ref([]); // Array para guardar los mensajes recibidos/enviados
-const newMessage = ref(''); // v-model para el input de nuevo mensaje
-const chatWindowRef = ref(null); // Ref para el contenedor de mensajes (para scroll)
-
-// --- NUEVO: Estado para Contactos y Selección ---
-const contacts = ref([]); // Lista de usuarios con quien chatear {id, name, surname, type}
+// Estado del Chat ---
+const messages = ref([]);
+const newMessage = ref('');
+const chatWindowRef = ref(null);
+const contacts = ref([]);
 const isLoadingContacts = ref(false);
 const contactsError = ref('');
-const selectedContact = ref(null); // El contacto seleccionado actualmente {id, name, surname, type}
+const selectedContact = ref(null);
 const chatError = ref('');
-// --- Propiedad Computada para Rol ---
-// Necesitamos saber el rol para cargar los contactos correctos
+const isLoadingDetails = ref(false);
+
+// Estado de conexión
 const userRole = computed(() => {
   const token = localStorage.getItem('token');
   try {
@@ -131,7 +137,7 @@ const userRole = computed(() => {
   }
 });
 
-// --- NUEVA: Función para cargar contactos ---
+// Función para cargar contactos
 async function fetchContacts() {
   // Solo cargar si estamos conectados y tenemos ID y Rol
   if (!isConnected.value || !userId.value || !userRole.value) {
@@ -177,9 +183,6 @@ async function fetchContacts() {
     } else if (userRole.value === 2) {
       // Soy Profesor -> Cargar Alumnos
       console.log('ChatPage: Cargando alumnos para profesor', userId.value);
-      // Usamos getMyStudents. Podríamos necesitar todos, no solo los de la pág 1.
-      // Pedimos una página muy grande para simular "todos" por ahora.
-      // Idealmente, el backend tendría un endpoint para "todos mis alumnos para chat".
       response = await RelationService.getMyStudents(userId.value, { page: 1, limit: 1000 });
       if (response.success && response.students) {
         // Procesar para obtener alumnos únicos
@@ -197,91 +200,83 @@ async function fetchContacts() {
     }
     console.log('Chat contacts loaded:', contacts.value);
   } catch (error) {
-    console.error('Error fetching contacts:', error);
+    console.error('>>> ChatPage: Error DENTRO de fetchContacts:', error); // Log detallado
     contactsError.value = error.response?.data?.message || error.message || 'Error al cargar contactos.';
   } finally {
     isLoadingContacts.value = false;
   }
 }
 
-// --- NUEVA: Función para seleccionar contacto ---
 function selectContact(contact) {
-  try {
-    if (selectedContact.value?.id === contact.id) {
-      console.log('Contacto ya seleccionado, no hacer nada.');
-      return;
-    }
-    console.log('Contacto seleccionado:', contact);
-    selectedContact.value = contact;
-    messages.value = [];
-    chatError.value = ''; // Usar la variable de error del chat
+  if (selectedContact.value?.id === contact.id) return;
+  selectedContact.value = contact;
+  messages.value = [];
+  chatError.value = '';
+  isLoadingHistory.value = true; // Asume que tienes isLoadingHistory
 
-    // Lógica futura (comentada)
-    console.log(`Seleccionado chat con ${contact.name}. Funcionalidad real pendiente.`);
-    // Asegúrate que NO hay ningún alert() aquí
+  // --- Informar al composable qué chat está activo ---
+  setActiveChatPartner(contact.id);
+  // La función markSenderAsRead ahora se llama DENTRO de setActiveChatPartner
 
-    scrollToBottom(); // Esto también podría fallar si chatWindowRef es null
-  } catch (error) {
-    // --- Añadir CATCH aquí ---
-    // Logueamos el error específico que ocurre DENTRO de selectContact
-    console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-    console.error('!!! ERROR CAPTURADO DENTRO DE selectContact !!!', error);
-    console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-    // Mostramos un error local en lugar de dejar que salte al global
-    chatError.value = `Error al procesar selección: ${error.message}`;
-    // NO redirigimos, dejamos que el usuario vea el error aquí
-  }
+  // TODO: Cargar historial (la lógica de fetch va aquí)
+  fetchHistoryForContact(contact.id); // Necesitarías una función así
+
+  console.log(`Seleccionado chat con ${contact.name}.`);
+  scrollToBottom();
 }
-
-// --- Watcher para cargar contactos cuando se conecte ---
-watch(
-  isConnected,
-  (newValue, oldValue) => {
-    // Cargar contactos solo cuando pasamos de desconectado a conectado Y tenemos ID/Rol
-    if (newValue === true && oldValue === false && userId.value && userRole.value) {
-      console.log('Conectado! Cargando contactos...');
-      fetchContacts();
-    } else if (newValue === false) {
-      // Limpiar si nos desconectamos
-      contacts.value = [];
-      selectedContact.value = null;
-    }
-  },
-  { immediate: true }
-);
-
-// --- 3. Funciones de Chat ---
 
 // Se llama al pulsar Enviar o presionar Enter
 const sendMessage = () => {
   const textToSend = newMessage.value.trim();
-  // Añadir comprobación de que hay un contacto seleccionado
-  if (textToSend && isConnected.value && selectedContact.value) {
-    console.log(`ChatPage: Enviando mensaje "${textToSend}" al destinatario ID ${selectedContact.value.id}`);
-    emitEvent('sendMessage', {
-      recipientId: selectedContact.value.id, // <-- ENVIAMOS EL ID DEL DESTINATARIO
-      text: textToSend,
-    });
-    newMessage.value = '';
-    scrollToBottom();
-  } else if (!selectedContact.value) {
-    alert('Por favor, selecciona un contacto para enviarle un mensaje.');
-  } else if (!isConnected.value) {
-    alert('No estás conectado al chat.');
+  chatError.value = ''; // Limpiar error previo siempre
+
+  // Reemplazar Alerts por asignación a chatError
+  if (!selectedContact.value) {
+    chatError.value = 'Por favor, selecciona un contacto para enviarle un mensaje.';
+    console.warn(chatError.value); // Mantenemos log si quieres
+    return; // Detener
   }
+  if (!isConnected.value) {
+    chatError.value = 'No estás conectado al servidor de chat.';
+    console.warn(chatError.value);
+    return; // Detener
+  }
+  if (!textToSend) {
+    chatError.value = 'No puedes enviar un mensaje vacío.';
+    console.warn(chatError.value);
+    return; // Detener
+  }
+  // Si pasa validaciones, enviar mensaje
+  console.log(`ChatPage: Enviando mensaje "${textToSend}" al destinatario ID ${selectedContact.value.id}`);
+  emitEvent('sendMessage', {
+    recipientId: selectedContact.value.id,
+    text: textToSend,
+  });
+  newMessage.value = '';
+  scrollToBottom();
 };
 
 // Callback que se ejecuta cuando se recibe un evento 'newMessage' del servidor
 const handleNewMessage = (messageData) => {
-  console.log('ChatPage: Nuevo mensaje recibido:', messageData);
-  // TODO: Verificar si el mensaje es de/para el chat activo antes de añadirlo
-  // if(selectedContact.value && (messageData.senderId === selectedContact.value.id || messageData.senderId === userId.value)) {
-  messages.value.push({
-    ...messageData,
-    isOwnMessage: messageData.senderId === userId.value,
-  });
-  scrollToBottom();
-  // } else { console.log("Mensaje recibido para otro chat, ignorando display."); }
+  console.log('ChatPage: Raw newMessage recibido:', JSON.parse(JSON.stringify(messageData)));
+  const currentUserId = userId.value;
+  const partnerId = selectedContact.value?.id;
+  if (!partnerId || !currentUserId) return;
+  // Comprobar si el mensaje pertenece a la conversación activa:
+  const isRelevant =
+    (messageData.senderId === currentUserId && messageData.recipientId === partnerId) ||
+    (messageData.recipientId === currentUserId && messageData.senderId === partnerId);
+
+  if (isRelevant) {
+    // Añadir a la lista visible
+    messages.value.push({
+      ...messageData,
+      isOwnMessage: messageData.senderId === currentUserId,
+    });
+    scrollToBottom(); // Hacer scroll si es relevante
+  } else {
+    console.log('ChatPage: Mensaje recibido pero NO pertenece al chat activo. Ignorando display.');
+  }
 };
 
 // Función para hacer scroll automático al final del chat
@@ -294,20 +289,75 @@ const scrollToBottom = async () => {
   }
 };
 
-// Conectar cuando el componente se monte
-onMounted(() => {
-  console.log('ChatPage: Montado. Conectando socket...');
-  connect(); // Llama a connect() del composable
-  registerListener('newMessage', handleNewMessage); // Registra el listener para nuevos mensajes
-});
+const isLoadingHistory = ref(false); // Añadir si no existe
+async function fetchHistoryForContact(partnerId) {
+  if (!partnerId) return;
+  isLoadingHistory.value = true;
+  chatError.value = '';
+  try {
+    const response = await RelationService.getChatHistory(partnerId); // Asumiendo que está en RelationService
+    if (response.success && Array.isArray(response.history)) {
+      messages.value = response.history.map((msg) => ({ ...msg, isOwnMessage: msg.senderId === userId.value }));
+      scrollToBottom();
+    } else {
+      chatError.value = response.message || 'Error al cargar historial.';
+    }
+  } catch (error) {
+    chatError.value = error.response?.data?.message || error.message || 'Error.';
+  } finally {
+    isLoadingHistory.value = false;
+  }
+}
+
+watch(
+  [isConnected, userId], // 1. Array de fuentes a observar
+  ([newIsConnected, newUserId], [oldIsConnected, oldUserId]) => {
+    // --- Lógica para registrar/desregistrar listeners basada en isConnected ---
+    if (newIsConnected && !oldIsConnected) {
+      // Acabamos de conectar (pasamos de false a true)
+      console.log('Watcher Combinado: Registrando listeners por nueva conexión.');
+      registerListener('newMessage', handleNewMessage);
+    } else if (!newIsConnected && oldIsConnected) {
+      // Acabamos de desconectar (pasamos de true a false)
+      console.log('Watcher Combinado: Desregistrando listeners por desconexión.');
+      unregisterListener('newMessage', handleNewMessage);
+    }
+
+    // --- Lógica para cargar contactos ---
+    if (newIsConnected && newUserId && contacts.value.length === 0) {
+      console.log('Watcher Combinado: Conectado con ID y sin contactos, llamando a fetchContacts.');
+      fetchContacts();
+    }
+
+    // --- Lógica para limpiar estado si nos desconectamos o perdemos el usuario ---
+    if (!newIsConnected || !newUserId) {
+      // Si perdemos conexión O el ID de usuario se vuelve null (ej. logout)
+      if (
+        contacts.value.length > 0 ||
+        selectedContact.value ||
+        messages.value.length > 0 ||
+        unreadSenders.value.size > 0
+      ) {
+        console.log('Watcher Combinado: Limpiando estado por desconexión o logout.');
+        contacts.value = [];
+        selectedContact.value = null;
+        messages.value = [];
+        unreadSenders.value.clear();
+        chatError.value = ''; // Limpiar también errores de chat
+      }
+    }
+  },
+  {
+    immediate: true,
+  }
+);
 
 // 3. Desconectar cuando el componente se destruya
 onUnmounted(() => {
   console.log('ChatPage: Desmontado.');
   // Limpiar el listener cuando el componente se destruye
   unregisterListener('newMessage', handleNewMessage);
-  // Decidimos no desconectar automáticamente por ahora
-  // disconnect();
+  setActiveChatPartner(null);
 });
 </script>
 

@@ -12,6 +12,7 @@ const http = require('http'); // Módulo http nativo de Node
 const jwt = require('jsonwebtoken'); // JWT para manejar autenticación
 const JWT_SECRET = process.env.JWT_SECRET; // Clave secreta para firmar el JWT
 const { Server } = require('socket.io');
+const chatHistorySchema = require('./models/mongo/chatHistory'); // Modelo de Mongoose para el historial de chat
 
 // Importar rutas
 const authRoutes = require('./routes/authRoutes');
@@ -19,6 +20,7 @@ const userRoutes = require('./routes/userRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const studentsTeachersRelationRoutes = require('./routes/studentsTeachersRelationRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 
@@ -86,11 +88,12 @@ app.use(express.json());
 app.use('/uploads/profile_images', express.static(path.join(__dirname, 'uploads/profile_images')));
 
 // Usar rutas
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/roles', roleRoutes);
-app.use('/relations', studentsTeachersRelationRoutes);
-app.use('/subjects', subjectRoutes);
+app.use('/auth', authRoutes); // Ruta para autenticación
+app.use('/users', userRoutes); // Ruta para los usuarios
+app.use('/roles', roleRoutes); // Ruta para los roles
+app.use('/relations', studentsTeachersRelationRoutes); // Ruta para las relaciones entre estudiantes y profesores
+app.use('/subjects', subjectRoutes); // Ruta para las asignaturas
+app.use('/api/chats', chatRoutes); // Ruta para el historial de chat
 
 // LÓGICA DE SOCKET.IO
 
@@ -115,7 +118,7 @@ io.on('connection', (socket) => {
     return; // Salir del handler de conexión
   }
 
-  socket.on('sendMessage', (data) => {
+  socket.on('sendMessage', async (data) => {
     // data debería ser { recipientId: X, text: '...' } enviado por el cliente
     const sender = socket.user; // El usuario que envía (obtenido del socket autenticado)
     const messageText = data?.text?.trim();
@@ -128,8 +131,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    console.log(`Mensaje recibido de ${socket.user.username} ${socket.id}): "${messageText}"`);
-
     // Creamos el objeto mensaje que reenviaremos y/o guardaremos
     const messageToSend = {
       senderId: sender.id,
@@ -138,13 +139,31 @@ io.on('connection', (socket) => {
       text: messageText,
       timestamp: new Date(),
     };
-    const recipientSocketId = userSockets.get(recipientId);
 
-    // 2. Enviar al destinatario SI está conectado
+    // Guardar el mensaje en MongoDB (historial de chat)
+    try {
+      // Crear una nueva instancia del modelo ChatHistory con los datos
+      const newMessage = new chatHistorySchema(messageToSend);
+      // Guardar el documento en la colección 'chathistories'
+      await newMessage.save();
+      // Loguear éxito (opcional, útil para debug)
+      console.log(`💾 Mensaje guardado en MongoDB. ID Mongoose: ${newMessage._id}`);
+    } catch (dbSaveError) {
+      // Error específico al guardar en MongoDB
+      console.error('❌ ERROR al guardar mensaje en MongoDB:', dbSaveError);
+    }
+
+    // Enviar al destinatario SI está conectado
+    const recipientSocketId = userSockets.get(recipientId);
     if (recipientSocketId) {
       console.log(`Enviando 'newMessage' a destinatario ${recipientId} (Socket: ${recipientSocketId})`);
       // io.to() se usa para enviar a sockets específicos o salas
       io.to(recipientSocketId).emit('newMessage', messageToSend);
+      // Enviar notificación simple SOLO al destinatario para indicador "no leído"
+      io.to(recipientSocketId).emit('newMessageNotification', {
+        senderId: sender.id,
+        senderUsername: sender.username, // Enviamos quién lo manda
+      });
     } else {
       console.log(`Destinatario ${recipientId} no conectado. Mensaje no entregado en tiempo real.`);
       // Aquí podríamos guardar el mensaje en BD como 'no leído'

@@ -2,105 +2,85 @@
 
 <template>
   <div id="app">
-    <Navbar :isLoggedIn="isLoggedIn" :userRole="userRole" @logout="logout" />
-
-    <router-view />
+    <Navbar :isLoggedIn="isLoggedIn" :userRole="userRole" />
+    <main class="container mt-3">
+      <RouterView />
+    </main>
   </div>
 </template>
 
-<script>
-import Navbar from './components/Navbar.vue';
+<script setup>
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import AuthService from '@/services/auth/AuthService';
+import { useSocket } from '@/composables/useSocket';
+import Navbar from '@/components/Navbar.vue';
+import { useAuth } from '@/composables/useAuth';
 
-export default {
-  name: 'App',
-  components: {
-    Navbar,
-  },
-  data() {
-    return {
-      // Estado inicial basado en el token al cargar
-      isLoggedIn: !!localStorage.getItem('token'),
-      currentUser: null, // Inicializa como null hasta que se cargue el usuario
-      isFetchingUser: false,
-      authChangeListener: null,
-    };
-  },
-  computed: {
-    userRole() {
-      return this.currentUser?.rol;
-    },
-  },
-  methods: {
-    // Método para obtener los datos del usuario actual desde el backend
-    async fetchCurrentUser() {
-      if (this.isLoggedIn && !this.currentUser && !this.isFetchingUser) {
-        this.isFetchingUser = true;
-        try {
-          console.log('App.vue: Obteniendo datos del usuario actual...');
-          const userData = await AuthService.getMe(); // Asume que devuelve el objeto usuario
-          this.currentUser = userData.user || userData;
-          console.log('App.vue: Datos del usuario actual guardados:', this.currentUser);
-        } catch (error) {
-          console.error('App.vue: Error al obtener datos del usuario:', error);
-        } finally {
-          this.isFetchingUser = false; // Desmarcar al finalizar (éxito o error)
-        }
-      } else if (!this.isLoggedIn) {
-        this.currentUser = null;
+// Estado de Autenticación Reactivo
+const isLoggedIn = ref(!!localStorage.getItem('token'));
+const currentUser = ref(null); // Guarda el objeto { id, name, rol, ... }
+const isFetchingUser = ref(false);
+
+// Socket Connection
+const { connect: connectSocket, disconnect: disconnectSocket } = useSocket();
+
+// Función para Cargar Usuario
+const fetchCurrentUser = async () => {
+  if (isFetchingUser.value) return; // Evitar llamadas concurrentes
+  if (isLoggedIn.value && !currentUser.value) {
+    // Solo si logueado y sin datos
+    isFetchingUser.value = true;
+    try {
+      const response = await AuthService.getMe();
+      if (response.success && response.user) {
+        currentUser.value = response.user;
       } else {
-        console.log('App.vue: fetchCurrentUser omitido (ya fetching, no logueado, o ya hay datos).');
+        if (isLoggedIn.value) AuthService.logout(); // Forzar logout si falla getMe estando logueado
       }
-    },
-
-    // Método para manejar cambios de autenticación
-    handleAuthChange(loggedInStatus) {
-      console.log('App.vue: Estado de login cambiado a:', loggedInStatus);
-      if (this.isLoggedIn !== loggedInStatus) {
-        this.isLoggedIn = loggedInStatus;
-        if (loggedInStatus) {
-          console.log('App.vue: Logged in, obteniendo datos del usuario...');
-          this.fetchCurrentUser(); // Obtiene datos si se loguea
-        } else {
-          console.log('App.vue: Logged out, limpiando datos del usuario...');
-          this.currentUser = null; // Limpia datos si hace logout
-        }
-      } else {
-        console.log('App.vue: Estado de login no cambió, no se hace nada extra.');
-      }
-    },
-
-    logout() {
-      AuthService.logout();
-      this.$router.replace('/');
-      console.log('App.vue: Solicitado logout y redirigido a /');
-    },
-  },
-  watch: {
-    isLoggedIn(newVal, oldVal) {
-      if (newVal === true) {
-        this.fetchCurrentUser();
-      } else if (newVal === false) {
-        this.currentUser = null;
-      }
-    },
-  },
-  mounted() {
-    this.authChangeListener = (event) => {
-      this.handleAuthChange(event.detail.isLoggedIn);
-    };
-    window.addEventListener('auth-change', this.authChangeListener);
-    console.log('App.vue mounted, auth listener añadido.');
-
-    // Intenta cargar datos del usuario al inicio si está logueado
-    console.log('App.vue mounted: Intentando fetch inicial de usuario si está logueado.');
-    this.fetchCurrentUser();
-  },
-  beforeUnmount() {
-    window.removeEventListener('auth-change', this.authChangeListener);
-    console.log('App.vue unmounted, auth listener quitado.');
-  },
+    } catch (error) {
+      console.error('App(setup): Catch fetching user data:', error);
+      if (isLoggedIn.value) AuthService.logout(); // Forzar logout en error
+    } finally {
+      isFetchingUser.value = false;
+    }
+  } else if (!isLoggedIn.value) {
+    currentUser.value = null; // Limpiar si no está logueado
+  }
 };
+
+// Manejador evento
+const handleAuthChange = (event) => {
+  const loggedInStatus = event.detail.isLoggedIn;
+  isLoggedIn.value = loggedInStatus; // Actualiza el ref local
+};
+
+// Registrar/Eliminar Listener Global
+onMounted(() => {
+  window.addEventListener('auth-change', handleAuthChange);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('auth-change', handleAuthChange);
+});
+
+// Watcher para conectar/desconectar socket y cargar datos
+watch(
+  isLoggedIn,
+  (newIsLoggedIn) => {
+    if (newIsLoggedIn) {
+      // Login
+      fetchCurrentUser(); // Intenta cargar datos si no los tiene
+      connectSocket(); // Conecta el socket
+    } else {
+      // Logout
+      currentUser.value = null;
+      disconnectSocket();
+    }
+  },
+  { immediate: true }
+);
+// --- Computed para pasar el rol a Navbar ---
+const userRole = computed(() => currentUser.value?.rol);
 </script>
 
 <style></style>
