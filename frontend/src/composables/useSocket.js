@@ -147,6 +147,16 @@ export function useSocket() {
     }
   };
 
+  // Computed para saber si hay mensajes no leídos
+  const clearUnreadSenders = () => {
+    if (unreadSenders.value.size > 0) {
+      // Solo si hay algo que limpiar
+      unreadSenders.value.clear();
+      unreadSenders.value = new Set(unreadSenders.value); // Forzar reactividad
+      console.log('useSocket: Todos los indicadores "no leído" limpiados.');
+    }
+  };
+
   // Exponer estado global (readonly) y métodos
   return {
     isConnected: readonly(isConnected),
@@ -162,5 +172,6 @@ export function useSocket() {
     unregisterListener,
     markSenderAsRead,
     setActiveChatPartner,
+    clearUnreadSenders,
   };
 }

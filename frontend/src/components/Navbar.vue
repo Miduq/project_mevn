@@ -58,9 +58,17 @@
               </span>
             </router-link>
           </li>
-
           <li class="nav-item" v-if="isLoggedIn">
-            <a href="#" class="nav-link" @click.prevent="logoutAndRedirect" title="Cerrar Sesión">
+            <router-link
+              class="nav-link"
+              :class="{ active: $route.name === 'ConversationListPage' }"
+              to="/conversations"
+            >
+              Conversaciones
+            </router-link>
+          </li>
+          <li class="nav-item" v-if="isLoggedIn">
+            <a href="#" class="nav-link" @click.prevent="() => logoutAndRedirect()" title="Cerrar Sesión">
               <i class="bi bi-box-arrow-right"></i>
               <span class="d-none d-lg-inline ms-1">Salir</span>
             </a>

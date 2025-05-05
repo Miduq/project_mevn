@@ -12,4 +12,14 @@ router.get(
   chatController.getChatHistory
 );
 
+// Ruta para la lista de conversaciones
+router.get(
+  '/conversations',
+  isAuthenticated, // Solo usuarios logueados pueden ver sus conversaciones
+  chatController.listConversations
+);
+
+// Ruta para descargar el historial de chat
+router.get('/download/:otherUserId', isAuthenticated, chatController.downloadChatCsv);
+
 module.exports = router;

@@ -5,9 +5,13 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
+const { OAuth2Client } = require('google-auth-library');
+const { formatUserOutput } = require('../utils/userFormatter');
 
+const EMAIL_CLIENT_ID = process.env.EMAIL_CLIENT_ID;
 const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_PROFESOR = '3rhb23uydb238ry6g2429hrh';
+const client = new OAuth2Client(EMAIL_CLIENT_ID);
 
 // Lógica para el inicio de sesión
 exports.login = async (req, res) => {
@@ -221,5 +225,117 @@ exports.getCurrentUser = async (req, res, next) => {
     res.json({ success: true, user: userResponse });
   } catch (error) {
     next(error);
+  }
+};
+
+// Funcion para registrar un nuevo usuario con Google
+exports.verifyGoogleToken = async (req, res, next) => {
+  const { credential } = req.body; // El token JWT de Google enviado por el frontend
+
+  if (!credential) {
+    return res.status(400).json({ success: false, message: 'No se proporcionó credencial de Google.' });
+  }
+  if (!EMAIL_CLIENT_ID) {
+    console.error('ERROR FATAL: GOOGLE_CLIENT_ID no definido en .env');
+    return res.status(500).json({ success: false, message: 'Error de configuración del servidor [GAuth].' });
+  }
+
+  try {
+    // 1. Verificar el token ID de Google
+    console.log('Verificando Google ID Token...');
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: EMAIL_CLIENT_ID, // Especifica el Client ID de tu aplicación
+    });
+    const payload = ticket.getPayload();
+    console.log('Payload de Google verificado:', payload);
+
+    // 2. Extraer datos necesarios
+    const googleId = payload['sub']; // ID único de Google para el usuario
+    const email = payload['email'];
+    const name = payload['given_name'] || 'Usuario'; // Nombre de pila
+    const surname = payload['family_name'] || 'Google'; // Apellido
+    const profile_image_google = payload['picture']; // URL de la imagen de Google
+
+    if (!googleId || !email) {
+      throw new Error('El token de Google no contenía ID o email.');
+    }
+
+    // 3. Buscar usuario en NUESTRA BD por googleId
+    let user = await User.findOne({ where: { id_google: googleId }, include: [{ model: Role, as: 'userRole' }] });
+
+    if (user) {
+      // --- Usuario YA existe ---
+      console.log(`Usuario encontrado por Google ID: ${user.id}`);
+      // Verificar si está activo (opcional, Google ya verifica email)
+      if (!user.active) {
+        // Podríamos activarlo automáticamente o mostrar un error específico
+        console.warn(`Usuario ${user.id} encontrado pero no está activo. Activando...`);
+        user.active = 1; // Activar cuenta
+        // Limpiar tokens de validación/reseteo si los tuviera
+        user.access_token = null;
+        user.password_token = null;
+        await user.save();
+      }
+      // ¿Actualizar nombre/foto con los de Google cada vez? Opcional.
+      // user.name = name; user.surname = surname; user.profile_image = profile_image_google; await user.save();
+    } else {
+      // --- Usuario NO existe -> Crear uno nuevo ---
+      console.log(`Usuario con Google ID ${googleId} no encontrado. Creando nuevo usuario...`);
+      // Comprobar si el EMAIL ya existe (por registro normal)
+      const emailExists = await User.findOne({ where: { email: email } });
+      if (emailExists) {
+        // Qué hacer? Vincular cuenta? Mostrar error? Por ahora error.
+        console.warn(`El email ${email} ya existe para un usuario no-google. No se puede crear.`);
+        return res
+          .status(409)
+          .json({ success: false, message: `El email ${email} ya está registrado. Inicia sesión de forma normal.` });
+      }
+
+      // Generar un username único (ej: a partir del email o random)
+      let username = email.split('@')[0] + Math.floor(Math.random() * 1000);
+      // Generar una contraseña "falsa" o aleatoria (no se usará para login)
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = await User.create({
+        username: username, // O genera uno diferente
+        name: name,
+        surname: surname,
+        email: email,
+        password: hashedPassword, // Password requerido, pero no se usará
+        rol: 1, // <-- ROL POR DEFECTO para nuevos usuarios Google (ej: Alumno)
+        active: 1, // Activado directamente (email verificado por Google)
+        id_google: googleId, // Guardar el ID de Google
+        profile_image: profile_image_google, // Guardar foto de Google
+        // access_token y password_token se quedan null
+      });
+      console.log(`Nuevo usuario creado con ID: ${user.id}`);
+      // Necesitamos recargar para incluir el rol si no lo devuelve create
+      user = await User.findByPk(user.id, { include: [{ model: Role, as: 'userRole' }] });
+    }
+
+    // 4. Generar NUESTRO token JWT para la sesión de la aplicación
+    const appTokenPayload = {
+      id: user.id,
+      username: user.username,
+      role: user.rol, // Asegúrate que 'rol' tiene el ID numérico
+    };
+    const appToken = jwt.sign(appTokenPayload, JWT_SECRET, { expiresIn: '1d' }); // O tu tiempo de expiración
+
+    // 5. Devolver éxito con NUESTRO token JWT y datos formateados
+    const userResponse = formatUserOutput(user); // Usa el helper
+    res.json({
+      success: true,
+      message: 'Inicio de sesión con Google exitoso.',
+      token: appToken, // Enviar nuestro token
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error('Error verificando token de Google o gestionando usuario:', error);
+    if (error.message?.includes('Token used too late') || error.message?.includes('Invalid token signature')) {
+      return res.status(401).json({ success: false, message: 'Credencial de Google inválida o expirada.' });
+    }
+    next(error); // Pasar otros errores al manejador global
   }
 };

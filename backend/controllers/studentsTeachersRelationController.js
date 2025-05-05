@@ -51,7 +51,10 @@ exports.getMyStudents = async (req, res, next) => {
     if (isNaN(teacherId) || isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
       return res.status(400).json({ success: false, message: 'Parámetros de profesor o paginación inválidos.' });
     }
-
+    // --- 👇👇👇 AÑADE ESTOS LOGS AQUÍ 👇👇👇 ---
+    console.log(`[getMyStudents] Check Permiso ANTES DEL IF: req.user =`, JSON.stringify(req.user)); // Loguea el objeto user completo del token
+    console.log(`[getMyStudents] Check Permiso ANTES DEL IF: req.params.teacherId = ${teacherId}`); // Loguea el ID de la URL
+    // --- 👆👆👆 FIN LOGS 👆👆👆 ---
     // Verificar permiso
     if (!req.user || req.user.id !== parseInt(teacherId)) {
       return res.status(403).json({ success: false, message: 'No tienes permiso para ver estos datos.' });

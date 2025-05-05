@@ -13,6 +13,7 @@ import SubjectManagementPage from '@/views/subjects/SubjectManagementPage.vue';
 import NotFoundPage from '../views/NotFoundPage.vue';
 import ErrorPage from '../views/ErrorPage.vue';
 import ChatPage from '@/views/chat/ChatPage.vue';
+import ConversationListPage from '@/views/chat/ConversationListPage.vue';
 import { jwtDecode } from 'jwt-decode';
 
 const routes = [
@@ -91,6 +92,12 @@ const routes = [
     path: '/chat',
     name: 'ChatPage',
     component: ChatPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/conversations',
+    name: 'ConversationListPage',
+    component: ConversationListPage,
     meta: { requiresAuth: true },
   },
   {

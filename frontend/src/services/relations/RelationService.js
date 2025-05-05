@@ -78,25 +78,6 @@ const getSubjectsTeacher = async (teacherId) => {
   }
 };
 
-// Función para obtener el historial de chat entre dos usuarios
-const getChatHistory = async (otherUserId) => {
-  if (!otherUserId) {
-    console.error('getChatHistory: otherUserId es requerido.');
-    // Podríamos devolver un error estándar
-    return { success: false, message: 'ID de usuario no válido.', history: [] };
-  }
-  try {
-    // Llama a la nueva ruta GET /api/chats/history/:otherUserId
-    const url = `/api/chats/history/${otherUserId}`;
-    console.log(`RelationService: GET ${url}`);
-    const response = await apiClient.get(url);
-    // Devuelve la respuesta completa del backend { success, history }
-    return response.data;
-  } catch (error) {
-    console.error(`Error en servicio getChatHistory con ${otherUserId}:`, error.response?.data || error.message);
-    throw error; // Propaga el error para que el componente lo maneje
-  }
-};
 export default {
   getRelationsForStudent,
   addRelation,
@@ -104,5 +85,4 @@ export default {
   getMyProfessors,
   getMyStudents,
   getSubjectsTeacher,
-  getChatHistory,
 };

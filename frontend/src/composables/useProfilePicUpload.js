@@ -1,38 +1,15 @@
 // frontend/src/composables/useProfilePicUpload.js
 
 import { ref, computed, watch, readonly } from 'vue';
-import apiClient from '@/services/apiClient';
 import AuthService from '@/services/auth/AuthService';
 
 // Este composable se encarga de la subida de imágenes de perfil
-export function useProfilePicUpload(userIdRef, initialImage) {
+export function useProfilePicUpload(userIdRef, initialImageUrlRef) {
   const profileImageUrl = ref(''); //URL de la imagen
-  const selectefFile = ref(null); // Archivo seleccionado en el input
+  const selectedFile = ref(null); // Archivo seleccionado en el input
   const isUploading = ref(false); // Estado de carga
   const uploadError = ref(''); // Mensaje de error en la subida de imagen
   const uploadSuccess = ref(''); // Mensaje de éxito en la subida de imagen
-
-  // Helper para obtener la URL del backend
-  const backendBaseUrl = computed(() => {
-    return apiClient.defaults.baseURL?.replace('/api', '') || 'http://localhost:3000';
-  });
-
-  // Helper para construir la URL de la imagen guardada
-  const calculateImageUrl = (filename) => {
-    if (!filename) return ''; // Devuelve nada sino hay nombre de archivo
-    return `${backendBaseUrl.value}/uploads/profile_images/${filename}`; // Devuelve la URL completa
-  };
-
-  // Watcher para la imagen inicial
-  watch(
-    initialImage,
-    (newImage) => {
-      if (!selectefFile.value) {
-        profileImageUrl.value = calculateImageUrl(newImage); // Calcula la URL de la imagen
-      }
-    },
-    { immediate: true }
-  );
 
   // Validación del archivo
   const validateFile = (file) => {
@@ -49,27 +26,43 @@ export function useProfilePicUpload(userIdRef, initialImage) {
     return true;
   };
 
+  // Watcher para la URL inicial
+  watch(
+    initialImageUrlRef,
+    (newUrl) => {
+      if (!selectedFile.value) {
+        profileImageUrl.value = newUrl || '';
+      }
+    },
+    { immediate: true }
+  );
+
   // Función para subir la imagen
   const onFileChange = (event) => {
-    uploadError.value = ''; // Limpia errores previos
-    uploadSuccess.value = ''; // Limpia mensajes de éxito previos
-    selectefFile.value = null; // Reinicia el archivo seleccionado
-    const fileInput = event.target; // Obtiene el input de archivo
-    const file = fileInput?.files?.[0]; // Obtiene el archivo seleccionado
+    uploadError.value = '';
+    uploadSuccess.value = '';
+    selectedFile.value = null;
+    const fileInput = event.target;
+    const file = fileInput?.files?.[0];
 
     if (file && validateFile(file)) {
-      selectedFile.value = file; // Guarda el archivo seleccionado
-      profileImageUrl.value = URL.createObjectURL(file); // Crea una URL temporal para la imagen
+      selectedFile.value = file;
+      profileImageUrl.value = URL.createObjectURL(file);
     } else {
-      profileImageUrl.value = calculateImageUrl(initialImage); // Si no hay archivo, usa la imagen inicial
-      if (fileInput) fileInput.value = ''; // Limpia el input de archivo si era inválido
+      // Revertir a la URL original si el archivo es inválido
+      profileImageUrl.value = initialImageUrlRef.value || '';
+      if (fileInput) fileInput.value = '';
+    }
+    // Limpiar input para permitir volver a seleccionar el mismo archivo
+    if (event.target) {
+      event.target.value = '';
     }
   };
 
   // Computed para la URL de la imagen
   const updateProfilePic = async () => {
     const currentUserId = userIdRef.value; // Obtiene el ID del usuario actual
-    const currentFile = selectefFile.value; // Obtiene el archivo seleccionado
+    const currentFile = selectedFile.value; // Obtiene el archivo seleccionado
 
     if (!currentFile || !currentUserId) {
       uploadError.value = 'No hay archivo seleccionado o ID de usuario no válido.';
@@ -83,29 +76,33 @@ export function useProfilePicUpload(userIdRef, initialImage) {
     formData.append('image', currentFile); // Crea un FormData con el archivo
 
     try {
-      const response = await AuthService.updateProfilePic(currentUserId, formData); // Llama al servicio para subir la imagen
+      const response = await AuthService.uploadProfilePicture(currentUserId, formData); // Llama al servicio para subir la imagen
       if (response.success) {
-        uploadSuccess.value = response.message; // Mensaje de éxito
-        const newFilename = response.filename; // Obtiene el nuevo nombre de archivo
+        uploadSuccess.value = response.message;
+        const newS3Url = response.imageUrl; // El backend devuelve la URL S3 completa aquí
 
         // Actualiza la URL con la respuesta
-        if (response.imageUrl) {
-          profileImageUrl.value = response.imageUrl;
-        } else if (newFilename) {
-          profileImageUrl.value = calculateImageUrl(newFilename);
-        } // Calcula la URL de la imagen
-        selectefFile.value = null; // Limpia el archivo seleccionado
+        if (newS3Url) {
+          profileImageUrl.value = newS3Url;
+        } else {
+          console.warn('Respuesta de subida exitosa pero sin imageUrl.');
+          uploadError.value = 'Subida OK, pero no se recibió URL.';
+          profileImageUrl.value = initialImageUrlRef.value || ''; // Revertir
+        }
+        selectedFile.value = null; // Limpiar selección local
       } else {
         uploadError.value = response.message; // Mensaje de error
       }
     } catch (error) {
       console.error('Error al subir la imagen:', error); // Error en la subida
-      uploadError.value =
-        error.response?.data?.message || error.message || 'Error al subir la imagen. Inténtalo de nuevo.';
-      profileImageUrl.value = calculateImageUrl(initialImage); // Reestablece la imagen inicial si falló la anterior
-      selectefFile.value = null; // Limpia el archivo seleccionado
+      uploadError.value = error.response?.data?.message || error.message || 'Error de red.';
     } finally {
-      isUploading.value = false; // Finaliza el estado de carga
+      isUploading.value = false;
+      // Revertir preview si falló
+      if (uploadError.value) {
+        profileImageUrl.value = initialImageUrlRef.value || ''; // Revertir a la URL inicial
+        selectedFile.value = null;
+      }
     }
   };
 
@@ -115,7 +112,7 @@ export function useProfilePicUpload(userIdRef, initialImage) {
     isUploading: readonly(isUploading), // Estado de carga
     uploadError: readonly(uploadError), // Mensaje de error
     uploadSuccess: readonly(uploadSuccess), // Mensaje de éxito
-    canUpload: computed(() => !!selectefFile.value), // Computed para verificar si se puede subir
+    canUpload: computed(() => !!selectedFile.value), // Computed para verificar si se puede subir
     onFileChange,
     updateProfilePic,
   };

@@ -6,7 +6,6 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./models'); // Importar modelos de Sequelize
 const mongoose = require('mongoose'); // Dependencia para MongoDB
-const multer = require('multer'); // Importar Multer para manejar errores de Multer
 const errorHandler = require('./middleware/errorHandler');
 const http = require('http'); // Módulo http nativo de Node
 const jwt = require('jsonwebtoken'); // JWT para manejar autenticación

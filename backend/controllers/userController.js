@@ -3,38 +3,8 @@
 const validator = require('validator');
 const teacherSubjectService = require('../services/teacherSubjectService');
 const { User, Role, Subject } = require('../models');
-const { Op, UniqueConstraintError, ForeignKeyConstraintError } = require('sequelize');
-const fs = require('fs').promises;
-const multer = require('multer');
-
-const formatUserOutput = (user) => {
-  if (!user) {
-    return null;
-  }
-  // Determina el nombre del rol de forma segura
-  let roleName = 'Desconocido';
-  if (user.userRole?.role_name) {
-    // Si la relación userRole se incluyó y tiene nombre
-    roleName = user.userRole.role_name;
-  } else if (user.rol === 1) {
-    roleName = 'Alumno';
-  } else if (user.rol === 2) {
-    roleName = 'Profesor';
-  }
-
-  // Devuelve el objeto limpio
-  return {
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    surname: user.surname, // Mantenemos surname
-    email: user.email,
-    rol: user.rol,
-    role_name: roleName, // Nombre del rol calculado
-    active: user.active,
-    profile_image: user.profile_image,
-  };
-};
+const { Op } = require('sequelize');
+const { formatUserOutput } = require('../utils/userFormatter');
 
 // Obtener todos los usuarios
 exports.getAllUsers = async (req, res, next) => {
@@ -239,73 +209,49 @@ exports.updateUser = async (req, res, next) => {
 };
 
 exports.uploadProfilePicture = async (req, res, next) => {
-  const { id: targetUserId } = req.params; // ID del usuario cuya foto se cambia
-  const requesterUser = req.user; // Usuario que hace la petición
+  const { id: targetUserId } = req.params;
+  const requesterUser = req.user;
+
   const targetUserIdParsed = parseInt(targetUserId);
   if (requesterUser.id !== targetUserIdParsed && requesterUser.role !== 2) {
-    // Borrar archivo subido si ya existe por Multer ANTES de devolver error
-    if (req.file && req.file.path) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (e) {
-        console.error('Error borrando archivo tras fallo de permiso:', e);
-      }
-    }
-    return res.status(403).json({ success: false, message: 'No tienes permiso para cambiar esta imagen de perfil.' });
+    return res.status(403).json({ success: false, message: 'No tienes permiso.' });
   }
+
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: req.fileValidationError || 'No se proporcionó un archivo de imagen válido o hubo un error en la subida.',
+    });
+  }
+
+  const imageUrl = req.file.location;
+  const userId = targetUserIdParsed;
+  console.log(`Archivo subido a S3 para User ${userId}. URL: ${imageUrl}`);
+  // -------------------------
+
   try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se proporcionó un archivo de imagen válido.',
-      });
-    }
+    // Actualizar DB con la URL de S3
+    const [numberOfAffectedRows] = await User.update(
+      { profile_image: imageUrl }, // <-- Guardar la URL completa de S3
+      { where: { id: userId } }
+    );
+    // ---------------------------------
 
-    const userId = req.params.id;
-    const filename = req.file.filename; // Multer nos da el nombre único del archivo guardado
-
-    // Actualizar el registro del usuario en la base de datos
-    const [numberOfAffectedRows] = await User.update({ profile_image: filename }, { where: { id: userId } });
-
-    // Verificar si se actualizó alguna fila
     if (numberOfAffectedRows === 0) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (e) {
-        console.error('Error borrando archivo de usuario no encontrado:', e);
-      }
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado para actualizar imagen.',
-      });
+      console.warn(`Imagen subida a S3 para usuario ${userId}, pero el usuario no se encontró en la BD.`);
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
     }
 
-    // Enviar una respuesta exitosa al frontend
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/profile_images/${filename}`;
-
+    // Éxito 200
     res.status(200).json({
       success: true,
       message: 'Imagen de perfil actualizada correctamente.',
-      filename: filename,
+      // Devolvemos la URL pública de S3
       imageUrl: imageUrl,
     });
   } catch (error) {
-    console.error('Error en uploadProfilePicture Controller:', error);
-
-    if (req.file && req.file.path) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (e) {
-        console.error('Error borrando archivo tras error en controlador:', e);
-      }
-    }
-
-    if (error instanceof multer.MulterError) {
-      return res.status(400).json({ success: false, message: `Error de Multer: ${error.message}` });
-    } else if (error.message && error.message.includes('Solo se permiten archivos de imagen')) {
-      // Error de tu fileFilter
-      return res.status(400).json({ success: false, message: error.message });
-    }
+    // Error al actualizar la BD
+    console.error('Error actualizando BD después de subir a S3:', error);
     next(error);
   }
 };
@@ -443,7 +389,7 @@ exports.deleteStudentByProfessor = async (req, res, next) => {
   }
 };
 
-exports.updateStudentByProfessor = async (req, res) => {
+exports.updateStudentByProfessor = async (req, res, next) => {
   // ID del estudiante a actualizar (de la URL)
   const { studentId } = req.params;
   // Usuario que realiza la petición (profesor) (del token)

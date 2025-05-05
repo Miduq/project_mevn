@@ -4,8 +4,8 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const isAuthenticated = require('../middleware/authMiddleware');
-const uploadMiddleware = require('../middleware/uploadMiddleware');
 const { isProfessor } = require('../middleware/roleMiddleware');
+const uploadS3 = require('../config/s3Config');
 
 // Ruta para obtener todos los usuarios
 router.get('/', isAuthenticated, isProfessor, userController.getAllUsers);
@@ -41,11 +41,6 @@ router.get('/:id', isAuthenticated, userController.getUserById);
 router.put('/:id', isAuthenticated, userController.updateUser);
 
 // Ruta para actualizar la IMAGEN DE PERFIL de un usuario
-router.put(
-  '/:id/profile-picture',
-  isAuthenticated,
-  uploadMiddleware.single('image'),
-  userController.uploadProfilePicture
-);
+router.put('/:id/profile-picture', isAuthenticated, uploadS3.single('image'), userController.uploadProfilePicture);
 
 module.exports = router;

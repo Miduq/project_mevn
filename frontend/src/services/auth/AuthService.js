@@ -20,6 +20,12 @@ const login = async (username, password) => {
     });
     if (response.data.success && response.data.token) {
       localStorage.setItem('token', response.data.token);
+      // --- Log añadido ---
+      console.log(
+        'AuthService Login: Token GUARDADO en localStorage:',
+        localStorage.getItem('token') ? `...${localStorage.getItem('token').slice(-6)}` : 'FALLO AL GUARDAR'
+      );
+      // -------------------
       window.dispatchEvent(
         new CustomEvent('auth-change', {
           detail: { isLoggedIn: true },

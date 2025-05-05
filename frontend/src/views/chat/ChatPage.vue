@@ -98,8 +98,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, computed, onUnmounted, nextTick, watch } from 'vue';
 import { useSocket } from '@/composables/useSocket.js';
+import ChatService from '@/services/chat/chatService';
 import RelationService from '@/services/relations/RelationService';
 import { jwtDecode } from 'jwt-decode';
 
@@ -112,6 +113,7 @@ const {
   unregisterListener, // <-- Obtenemos la función para limpiar
   unreadSenders, // <-- Obtenemos el Set global
   setActiveChatPartner, // <-- Obtenemos la función para limpiar
+  clearUnreadSenders, // <-- Obtenemos la función para limpiar
 } = useSocket(); // connect/disconnect no se llaman aquí directamente si App.vue lo maneja
 
 // Estado del Chat ---
@@ -295,7 +297,7 @@ async function fetchHistoryForContact(partnerId) {
   isLoadingHistory.value = true;
   chatError.value = '';
   try {
-    const response = await RelationService.getChatHistory(partnerId); // Asumiendo que está en RelationService
+    const response = await ChatService.getChatHistory(partnerId); // Asumiendo que está en RelationService
     if (response.success && Array.isArray(response.history)) {
       messages.value = response.history.map((msg) => ({ ...msg, isOwnMessage: msg.senderId === userId.value }));
       scrollToBottom();
@@ -342,7 +344,7 @@ watch(
         contacts.value = [];
         selectedContact.value = null;
         messages.value = [];
-        unreadSenders.value.clear();
+        clearUnreadSenders();
         chatError.value = ''; // Limpiar también errores de chat
       }
     }
